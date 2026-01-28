@@ -1,6 +1,7 @@
 {
   "name": "sakuedit",
   "version": "0.1.0",
+  "description": "SakuEdit - AI-Powered Video Style Transfer Editor",
   "private": true,
   "scripts": {
     "dev": "next dev",
