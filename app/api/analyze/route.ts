@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { analyzeStyle, transcribeAudio, generateSubtitles } from '@/lib/ai'
-import { downloadFromYouTube, extractAudio } from '@/lib/video-processor'
+import { analyzeStyle, analyzeVisualStyle, transcribeAudio, generateSubtitles } from '@/lib/ai'
+import { downloadFromYouTube, extractAudio, sampleVideoForStyleAnalysis } from '@/lib/video-processor'
 import { prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 
 /**
  * Analyze video editing style from a reference URL
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // 参考動画をダウンロード
     const downloadResult = await downloadFromYouTube(
-      `${referenceUrl}?t=10`, // 最初の10秒のみをダウンロードして高速化
+      referenceUrl,
       `${projectId}-reference`,
       'reference.mp4'
     )
@@ -97,10 +98,30 @@ export async function POST(request: NextRequest) {
       channelName: '',
     }
 
+    let visualProfile
+    try {
+      const styleSample = await sampleVideoForStyleAnalysis(
+        downloadResult.inputPath,
+        `${projectId}-reference`,
+        {
+          analysisDuration: 90,
+          maxFrames: 8,
+          sceneThreshold: 0.32,
+        }
+      )
+      visualProfile = await analyzeVisualStyle(styleSample, metadata)
+    } catch (error) {
+      console.error('Visual style analysis failed:', error)
+      return NextResponse.json(
+        { error: `Visual style analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}` },
+        { status: 500 }
+      )
+    }
+
     // スタイル分析を実行
     let styleAnalysis
     try {
-      styleAnalysis = await analyzeStyle(transcript, metadata)
+      styleAnalysis = await analyzeStyle(transcript, metadata, visualProfile)
     } catch (error) {
       console.error('Style analysis failed:', error)
       return NextResponse.json(
@@ -134,7 +155,7 @@ export async function POST(request: NextRequest) {
         progress: 100,
         progressMessage: 'Style analysis completed',
         referenceUrl,
-        result: styleAnalysis as any, // JsonValueとして保存
+        result: styleAnalysis as Prisma.InputJsonValue,
         startedAt: new Date(),
         completedAt: new Date(),
       },

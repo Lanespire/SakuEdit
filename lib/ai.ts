@@ -112,12 +112,55 @@ const StyleSettingsSchema = z.object({
   }),
 })
 
-const StyleAnalysisSchema = StyleSettingsSchema.extend({
-  visualProfile: VisualStyleSchema,
-})
-
 export type VisualStyleProfile = z.infer<typeof VisualStyleSchema>
-export type StyleAnalysisResult = z.infer<typeof StyleAnalysisSchema>
+export type StyleAnalysisResult = z.infer<typeof StyleSettingsSchema> & {
+  visualProfile: VisualStyleProfile
+}
+
+function createFallbackVisualProfile(): VisualStyleProfile {
+  return {
+    subtitleStyle: {
+      presence: 'none',
+      placement: 'unknown',
+      emphasis: 'clean',
+      outlineStyle: 'unknown',
+      textDensity: 'low',
+      dominantColors: [],
+      notes: 'Visual analysis unavailable',
+    },
+    cameraStyle: {
+      framing: 'unknown',
+      facialEmphasis: 'medium',
+      zoomStyle: 'unknown',
+      motionIntensity: 'medium',
+    },
+    bRollStyle: {
+      usage: 'medium',
+      dominantTypes: [],
+      notes: 'Visual analysis unavailable',
+    },
+    colorStyle: {
+      brightness: 'balanced',
+      saturation: 'balanced',
+      temperature: 'neutral',
+      palette: [],
+    },
+    compositionStyle: {
+      layout: 'mixed',
+      textCoverage: 'low',
+      backgroundComplexity: 'moderate',
+      notes: 'Visual analysis unavailable',
+    },
+    pacingStyle: {
+      inferredJumpCutFrequency: 'medium',
+      sceneCount: 0,
+      cutsPerMinute: 0,
+      averageShotLength: 0,
+      notes: 'Visual analysis unavailable',
+    },
+    creatorStyleSummary: 'Visual analysis unavailable',
+  }
+}
 
 // ============================================
 // ASR Types
@@ -198,20 +241,24 @@ export async function analyzeStyle(
     duration?: number
     channelName?: string
   },
+  visualProfile?: VisualStyleProfile,
   isPremium: boolean = false
 ): Promise<StyleAnalysisResult> {
   const model = isPremium ? PREMIUM_MODEL : DEFAULT_MODEL
+  const resolvedVisualProfile = visualProfile ?? createFallbackVisualProfile()
 
   const contextParts: string[] = []
   if (metadata?.title) contextParts.push(`Video Title: ${metadata.title}`)
   if (metadata?.channelName) contextParts.push(`Channel Name: ${metadata.channelName}`)
   if (metadata?.description) contextParts.push(`Video Description: ${metadata.description}`)
   if (metadata?.duration) contextParts.push(`Duration: ${metadata.duration} seconds`)
+  contextParts.push(`Visual Profile: ${JSON.stringify(resolvedVisualProfile)}`)
   contextParts.push(`Transcript: ${transcript}`)
 
   const systemPrompt = `You are a video editing style analyst specializing in short-form content (YouTube Shorts, TikTok, Reels).
 
 Analyze the video content and determine optimal editing style for creating engaging, fast-paced content.
+Use transcript cues for topic and pacing, but use the visual profile as the primary source for subtitle appearance, framing, composition, and jump-cut intensity.
 
 Analysis guidelines:
 1. **Cut Settings**: Determine optimal silence detection and cut frequency
@@ -233,7 +280,7 @@ Analysis guidelines:
 
   const { object } = await generateObject({
     model: openrouter(model),
-    schema: StyleAnalysisSchema,
+    schema: StyleSettingsSchema,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Analyze this video:\n\n${contextParts.join('\n\n')}` },
@@ -241,7 +288,10 @@ Analysis guidelines:
     temperature: 0.5,
   })
 
-  return object
+  return {
+    ...object,
+    visualProfile: resolvedVisualProfile,
+  }
 }
 
 export async function analyzeVisualStyle(
