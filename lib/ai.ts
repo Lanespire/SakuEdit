@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { createReadStream } from 'fs'
 import { DeepgramClient } from '@deepgram/sdk'
 import fs from 'fs/promises'
+import type { VideoStyleSample } from './video-processor'
 
 // ============================================
 // OpenRouter + Gemini Flash Configuration
@@ -44,7 +45,50 @@ const deepgram = DEEPGRAM_API_KEY
 // ============================================
 // Style Analysis Schema (Zod)
 // ============================================
-const StyleAnalysisSchema = z.object({
+const VisualStyleSchema = z.object({
+  subtitleStyle: z.object({
+    presence: z.enum(['none', 'light', 'moderate', 'heavy']),
+    placement: z.enum(['top', 'middle', 'bottom', 'mixed', 'unknown']),
+    emphasis: z.enum(['minimal', 'clean', 'bold', 'varied']),
+    outlineStyle: z.enum(['none', 'thin', 'thick', 'box', 'mixed', 'unknown']),
+    textDensity: z.enum(['low', 'medium', 'high']),
+    dominantColors: z.array(z.string()).max(5),
+    notes: z.string(),
+  }),
+  cameraStyle: z.object({
+    framing: z.enum(['close-up', 'medium', 'wide', 'mixed', 'unknown']),
+    facialEmphasis: z.enum(['low', 'medium', 'high']),
+    zoomStyle: z.enum(['rare', 'occasional', 'frequent', 'unknown']),
+    motionIntensity: z.enum(['low', 'medium', 'high']),
+  }),
+  bRollStyle: z.object({
+    usage: z.enum(['low', 'medium', 'high']),
+    dominantTypes: z.array(z.string()).max(5),
+    notes: z.string(),
+  }),
+  colorStyle: z.object({
+    brightness: z.enum(['dark', 'balanced', 'bright']),
+    saturation: z.enum(['muted', 'balanced', 'vivid']),
+    temperature: z.enum(['cool', 'neutral', 'warm', 'mixed']),
+    palette: z.array(z.string()).max(5),
+  }),
+  compositionStyle: z.object({
+    layout: z.enum(['centered', 'off-center', 'mixed']),
+    textCoverage: z.enum(['low', 'medium', 'high']),
+    backgroundComplexity: z.enum(['simple', 'moderate', 'busy']),
+    notes: z.string(),
+  }),
+  pacingStyle: z.object({
+    inferredJumpCutFrequency: z.enum(['low', 'medium', 'high']),
+    sceneCount: z.number(),
+    cutsPerMinute: z.number(),
+    averageShotLength: z.number(),
+    notes: z.string(),
+  }),
+  creatorStyleSummary: z.string(),
+})
+
+const StyleSettingsSchema = z.object({
   cutSettings: z.object({
     minSilence: z.number().describe('Minimum silence duration to cut (seconds)'),
     aggressiveness: z.enum(['low', 'medium', 'high']),
@@ -68,6 +112,11 @@ const StyleAnalysisSchema = z.object({
   }),
 })
 
+const StyleAnalysisSchema = StyleSettingsSchema.extend({
+  visualProfile: VisualStyleSchema,
+})
+
+export type VisualStyleProfile = z.infer<typeof VisualStyleSchema>
 export type StyleAnalysisResult = z.infer<typeof StyleAnalysisSchema>
 
 // ============================================
@@ -193,6 +242,91 @@ Analysis guidelines:
   })
 
   return object
+}
+
+export async function analyzeVisualStyle(
+  sample: VideoStyleSample,
+  metadata?: {
+    title?: string
+    description?: string
+    duration?: number
+    channelName?: string
+  },
+  isPremium: boolean = false
+): Promise<VisualStyleProfile> {
+  const model = isPremium ? PREMIUM_MODEL : DEFAULT_MODEL
+  const frameBuffers = await Promise.all(
+    sample.frames.map(async (frame) => ({
+      ...frame,
+      image: await fs.readFile(frame.path),
+    }))
+  )
+
+  const contextLines = [
+    metadata?.title ? `Video Title: ${metadata.title}` : null,
+    metadata?.channelName ? `Channel Name: ${metadata.channelName}` : null,
+    metadata?.description ? `Video Description: ${metadata.description}` : null,
+    metadata?.duration ? `Video Duration: ${metadata.duration} seconds` : null,
+    `Analyzed Window: ${sample.analysisDuration.toFixed(1)} seconds`,
+    `Detected Scene Changes: ${sample.sceneMetrics.sceneCount}`,
+    `Cuts Per Minute: ${sample.sceneMetrics.cutsPerMinute}`,
+    `Average Shot Length: ${sample.sceneMetrics.averageShotLength} seconds`,
+  ].filter(Boolean)
+
+  const userContent: Array<
+    | { type: 'text'; text: string }
+    | { type: 'image'; image: Buffer; mediaType: 'image/jpeg' }
+  > = [
+    {
+      type: 'text',
+      text: `Analyze this creator's visual editing style from sampled frames.\n\n${contextLines.join('\n')}`,
+    },
+  ]
+
+  for (const [index, frame] of frameBuffers.entries()) {
+    userContent.push({
+      type: 'text',
+      text: `Frame ${index + 1} at ${frame.timestamp.toFixed(1)} seconds`,
+    })
+    userContent.push({
+      type: 'image',
+      image: frame.image,
+      mediaType: 'image/jpeg',
+    })
+  }
+
+  const systemPrompt = `You are a Japanese YouTube style analyst focused on visible editing patterns.
+
+Use the sampled frames and the numeric scene metrics together.
+
+Rules:
+1. Describe only what is visually supported by the frames and scene metrics.
+2. If subtitles are not visible often enough, lower confidence by choosing conservative labels.
+3. Use the scene metrics directly for jump-cut related fields.
+4. Keep notes concrete and short.
+5. Dominant colors can be rough hex values or common color names.
+6. B-roll means shots that are not the main talking-head presentation.
+7. If the camera distance varies a lot, choose "mixed".`
+
+  const { object } = await generateObject({
+    model: openrouter(model),
+    schema: VisualStyleSchema,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ],
+    temperature: 0.2,
+  })
+
+  return {
+    ...object,
+    pacingStyle: {
+      ...object.pacingStyle,
+      sceneCount: sample.sceneMetrics.sceneCount,
+      cutsPerMinute: sample.sceneMetrics.cutsPerMinute,
+      averageShotLength: sample.sceneMetrics.averageShotLength,
+    },
+  }
 }
 
 // ============================================
@@ -471,6 +605,7 @@ const aiClient = {
   chatCompletion,
   streamChatCompletion,
   analyzeStyle,
+  analyzeVisualStyle,
   transcribeAudio,
   generateSubtitles,
   generateSRT,

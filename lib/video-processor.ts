@@ -56,6 +56,44 @@ export interface VideoMetadata {
   format?: string
 }
 
+interface FFprobeStream {
+  codec_type?: string
+  width?: number
+  height?: number
+  codec_name?: string
+}
+
+interface FFprobeFormat {
+  duration?: string
+  bit_rate?: string
+  format_name?: string
+}
+
+interface FFprobeResponse {
+  streams?: FFprobeStream[]
+  format?: FFprobeFormat
+}
+
+export interface SceneMetrics {
+  sampleDuration: number
+  sceneCount: number
+  sceneChangeTimestamps: number[]
+  cutsPerMinute: number
+  averageShotLength: number
+  threshold: number
+}
+
+export interface SampledFrame {
+  path: string
+  timestamp: number
+}
+
+export interface VideoStyleSample {
+  analysisDuration: number
+  frames: SampledFrame[]
+  sceneMetrics: SceneMetrics
+}
+
 export interface DownloadResult {
   success: boolean
   inputPath?: string
@@ -287,8 +325,8 @@ export async function getVideoMetadata(inputPath: string): Promise<VideoMetadata
     ffprobe.on('close', (code) => {
       if (code === 0) {
         try {
-          const data = JSON.parse(output)
-          const videoStream = data.streams?.find((s: any) => s.codec_type === 'video')
+          const data = JSON.parse(output) as FFprobeResponse
+          const videoStream = data.streams?.find((stream) => stream.codec_type === 'video')
           const format = data.format
 
           resolve({
@@ -311,6 +349,207 @@ export async function getVideoMetadata(inputPath: string): Promise<VideoMetadata
       reject(err)
     })
   })
+}
+
+function createEvenlySpacedTimestamps(duration: number, count: number): number[] {
+  if (duration <= 0 || count <= 0) {
+    return []
+  }
+
+  return Array.from({ length: count }, (_, index) =>
+    Number((((index + 1) * duration) / (count + 1)).toFixed(3))
+  )
+}
+
+function pickDistributedTimestamps(values: number[], count: number): number[] {
+  if (count <= 0 || values.length === 0) {
+    return []
+  }
+
+  if (values.length <= count) {
+    return values
+  }
+
+  if (count === 1) {
+    return [values[Math.floor(values.length / 2)]]
+  }
+
+  const selected: number[] = []
+  for (let index = 0; index < count; index++) {
+    const position = Math.round((index * (values.length - 1)) / (count - 1))
+    selected.push(values[position])
+  }
+  return selected
+}
+
+function chooseRepresentativeFrameTimestamps(
+  analysisDuration: number,
+  sceneChangeTimestamps: number[],
+  maxFrames: number
+): number[] {
+  const safeDuration = Math.max(analysisDuration, 1)
+  const preferredScenes = pickDistributedTimestamps(
+    sceneChangeTimestamps.filter((timestamp) => timestamp > 1 && timestamp < safeDuration - 1),
+    Math.min(sceneChangeTimestamps.length, Math.ceil(maxFrames / 2))
+  )
+
+  const evenlySpaced = createEvenlySpacedTimestamps(safeDuration, Math.max(maxFrames * 2, 1))
+  const merged = new Set<number>()
+
+  for (const timestamp of [...preferredScenes, ...evenlySpaced]) {
+    const clamped = Math.min(Math.max(timestamp, 0.2), Math.max(safeDuration - 0.2, 0.2))
+    merged.add(Number(clamped.toFixed(3)))
+    if (merged.size >= maxFrames) {
+      break
+    }
+  }
+
+  return Array.from(merged).sort((a, b) => a - b)
+}
+
+async function extractFrameSnapshot(
+  inputPath: string,
+  outputPath: string,
+  timestamp: number,
+  width: number = 720
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-ss', timestamp.toFixed(3),
+      '-i', inputPath,
+      '-frames:v', '1',
+      '-vf', `scale=${width}:-2`,
+      '-q:v', '3',
+      '-y',
+      outputPath,
+    ]
+
+    const ffmpeg = spawn('ffmpeg', args)
+    let stderrOutput = ''
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderrOutput += data.toString()
+    })
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`FFmpeg frame extraction failed with code ${code}: ${stderrOutput}`))
+      }
+    })
+
+    ffmpeg.on('error', (err) => {
+      reject(err)
+    })
+  })
+}
+
+export async function detectSceneChanges(
+  inputPath: string,
+  options: {
+    analysisDuration?: number
+    threshold?: number
+  } = {}
+): Promise<SceneMetrics> {
+  const analysisDuration = options.analysisDuration ?? Math.min(await getVideoDuration(inputPath), 90)
+  const threshold = options.threshold ?? 0.32
+
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-hide_banner',
+      '-t', analysisDuration.toFixed(3),
+      '-i', inputPath,
+      '-filter:v', `select='gt(scene,${threshold})',showinfo`,
+      '-an',
+      '-f', 'null',
+      '-',
+    ]
+
+    const ffmpeg = spawn('ffmpeg', args)
+    const timestamps: number[] = []
+    let stderrOutput = ''
+
+    ffmpeg.stderr.on('data', (data) => {
+      const output = data.toString()
+      stderrOutput += output
+
+      for (const match of output.matchAll(/pts_time:([0-9.]+)/g)) {
+        const timestamp = parseFloat(match[1])
+        if (Number.isFinite(timestamp)) {
+          timestamps.push(Number(timestamp.toFixed(3)))
+        }
+      }
+    })
+
+    ffmpeg.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`FFmpeg scene detection failed with code ${code}: ${stderrOutput}`))
+        return
+      }
+
+      const sceneChangeTimestamps = Array.from(new Set(timestamps)).sort((a, b) => a - b)
+      const safeDuration = Math.max(analysisDuration, 1)
+      const sceneCount = sceneChangeTimestamps.length
+
+      resolve({
+        sampleDuration: analysisDuration,
+        sceneCount,
+        sceneChangeTimestamps,
+        cutsPerMinute: Number(((sceneCount / safeDuration) * 60).toFixed(2)),
+        averageShotLength: Number((safeDuration / Math.max(sceneCount + 1, 1)).toFixed(2)),
+        threshold,
+      })
+    })
+
+    ffmpeg.on('error', (err) => {
+      reject(err)
+    })
+  })
+}
+
+export async function sampleVideoForStyleAnalysis(
+  inputPath: string,
+  projectId: string,
+  options: {
+    analysisDuration?: number
+    maxFrames?: number
+    sceneThreshold?: number
+  } = {}
+): Promise<VideoStyleSample> {
+  const requestedDuration = options.analysisDuration ?? 90
+  const maxFrames = options.maxFrames ?? 8
+  const totalDuration = await getVideoDuration(inputPath)
+  const analysisDuration = Math.min(totalDuration, requestedDuration)
+  const sceneMetrics = await detectSceneChanges(inputPath, {
+    analysisDuration,
+    threshold: options.sceneThreshold,
+  })
+
+  const frameTimestamps = chooseRepresentativeFrameTimestamps(
+    analysisDuration,
+    sceneMetrics.sceneChangeTimestamps,
+    maxFrames
+  )
+
+  const frameDir = path.join(await ensureProjectDir(projectId), 'style-analysis')
+  await fs.mkdir(frameDir, { recursive: true })
+
+  const frames: SampledFrame[] = []
+  for (const [index, timestamp] of frameTimestamps.entries()) {
+    const outputPath = path.join(frameDir, `sample-${index + 1}.jpg`)
+    await extractFrameSnapshot(inputPath, outputPath, timestamp)
+    frames.push({
+      path: outputPath,
+      timestamp,
+    })
+  }
+
+  return {
+    analysisDuration,
+    frames,
+    sceneMetrics,
+  }
 }
 
 /**
