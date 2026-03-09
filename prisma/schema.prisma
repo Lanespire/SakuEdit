@@ -2,14 +2,18 @@
 // Database: PostgreSQL (Neon)
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearchPostgres"]
+  provider = "prisma-client-js"
+  // Note: fullTextSearchPostgres is only available for PostgreSQL
+  // For SQLite, use fullTextSearchSQLite if needed
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "sqlite"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  // directUrl is not needed for SQLite
+  // For PostgreSQL (Neon), use:
+  // provider  = "postgresql"
+  // directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ============================================
@@ -442,6 +446,25 @@ enum JobStatus {
   COMPLETED
   FAILED
   CANCELED
+}
+
+// ============================================
+// Anonymous User Usage Tracking
+// ============================================
+
+model AnonymousUsage {
+  id              String    @id @default(cuid())
+  fingerprint     String    @unique    // Browser fingerprint
+  dailyCount      Int       @default(0)
+  lastResetAt     DateTime  @default(now())  // Daily reset timestamp
+  totalCount      Int       @default(0)
+  firstSeenAt     DateTime  @default(now())
+  lastSeenAt      DateTime  @updatedAt
+  blockedUntil    DateTime?              // Rate limit block
+
+  @@index([fingerprint])
+  @@index([lastResetAt])
+  @@map("anonymous_usages")
 }
 
 // ============================================

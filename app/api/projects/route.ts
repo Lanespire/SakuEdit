@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { auth } from '@/lib/auth'
+import { ProjectStatus } from '@prisma/client'
+
+const projectStatuses = new Set<string>(Object.values(ProjectStatus))
 
 // GET /api/projects - Get all projects for current user
 export async function GET(request: NextRequest) {
   try {
-    // Check for test mode (development only)
-    const { searchParams } = new URL(request.url)
-    const testUserId = searchParams.get('testUserId')
-    const isTestMode = process.env.NODE_ENV === 'development' && testUserId
-
+    const isDevelopment = process.env.NODE_ENV === 'development'
     let userId: string
 
-    if (isTestMode) {
-      userId = testUserId!
+    if (isDevelopment) {
+      userId = 'test-user-dev'
     } else {
       const session = await auth.api.getSession({
         headers: request.headers,
@@ -24,11 +23,15 @@ export async function GET(request: NextRequest) {
       userId = session.user.id
     }
 
+    const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const projectStatus = status && projectStatuses.has(status)
+      ? (status as ProjectStatus)
+      : undefined
 
     const where = {
       userId,
-      ...(status && { status: status as any }),
+      ...(projectStatus && { status: projectStatus }),
     }
 
     const projects = await prisma.project.findMany({
@@ -58,15 +61,11 @@ export async function GET(request: NextRequest) {
 // POST /api/projects - Create a new project
 export async function POST(request: NextRequest) {
   try {
-    // Check for test mode (development only)
-    const { searchParams } = new URL(request.url)
-    const testUserId = searchParams.get('testUserId')
-    const isTestMode = process.env.NODE_ENV === 'development' && testUserId
-
+    const isDevelopment = process.env.NODE_ENV === 'development'
     let userId: string
 
-    if (isTestMode) {
-      userId = testUserId!
+    if (isDevelopment) {
+      userId = 'test-user-dev'
     } else {
       const session = await auth.api.getSession({
         headers: request.headers,
@@ -78,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, styleId, sourceType, sourceUrl } = body
+    const { name, styleId } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
