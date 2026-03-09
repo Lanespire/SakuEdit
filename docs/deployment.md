@@ -69,9 +69,9 @@
 sst secrets set NextAuthSecretDev "your-secret-key-dev"
 sst secrets set --stage production NextAuthSecret "your-production-secret"
 
-# Groq API (ASR用)
-sst secrets set GroqApiKeyDev "gsk_xxx..."
-sst secrets set --stage production GroqApiKey "gsk_xxx..."
+# Deepgram API (ASR用)
+sst secrets set DeepgramApiKeyDev "dg_xxx..."
+sst secrets set --stage production DeepgramApiKey "dg_xxx..."
 ```
 
 ### 3. Prisma スキーマの修正

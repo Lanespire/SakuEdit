@@ -111,7 +111,7 @@
 - Better Auth
 - FFmpeg / FFprobe
 - Remotion
-- AI 利用は `.env` の `AI_API_KEY`, `AI_ENDPOINT`, `OPENROUTER_API_KEY` を前提にしてよい
+- AI 利用は `.env` の `OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY` を前提にしてよい
 
 ### ローカル完動の定義
 以下をすべて満たして初めて「完了」とみなす。
@@ -301,9 +301,9 @@
 - `BETTER_AUTH_SECRET`
 - `BETTER_AUTH_URL`
 - `NEXT_PUBLIC_BETTER_AUTH_URL`
-- `AI_API_KEY`
-- `AI_ENDPOINT`
 - `OPENROUTER_API_KEY`
+- `DEEPGRAM_API_KEY`
+- `DEEPGRAM_MODEL`
 - `UPLOAD_DIR`
 - 必須バイナリを明記
   - `ffmpeg`
