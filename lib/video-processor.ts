@@ -260,7 +260,8 @@ export async function downloadFromYouTube(
 export async function extractAudio(
   inputPath: string,
   outputPath: string,
-  sampleRate: number = 16000
+  sampleRate: number = 16000,
+  durationSeconds?: number
 ): Promise<{ success: boolean; outputPath?: string; error?: string }> {
   return new Promise((resolve) => {
     const args = [
@@ -269,6 +270,7 @@ export async function extractAudio(
       '-acodec', 'pcm_s16le', // 16-bit PCM
       '-ar', sampleRate.toString(), // サンプルレート
       '-ac', '1', // モノラル
+      ...(durationSeconds ? ['-t', durationSeconds.toString()] : []),
       '-y',
       outputPath
     ]

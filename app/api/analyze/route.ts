@@ -9,6 +9,8 @@ import { Prisma } from '@prisma/client'
  * This downloads the reference video and analyzes its actual content
  */
 export async function POST(request: NextRequest) {
+  const analysisWindowSeconds = 90
+
   try {
     const body = await request.json()
     const { projectId, referenceUrl } = body
@@ -63,7 +65,8 @@ export async function POST(request: NextRequest) {
     const extractResult = await extractAudio(
       downloadResult.inputPath,
       audioPath,
-      16000
+      16000,
+      analysisWindowSeconds
     )
 
     if (!extractResult.success || !extractResult.outputPath) {
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
         downloadResult.inputPath,
         `${projectId}-reference`,
         {
-          analysisDuration: 90,
+          analysisDuration: analysisWindowSeconds,
           maxFrames: 8,
           sceneThreshold: 0.32,
         }
