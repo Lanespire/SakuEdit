@@ -47,3 +47,12 @@ next-env.d.ts
 # Test results
 /test-results/
 /playwright-report/
+
+# sst
+.sst
+
+# open-next
+.open-next
+
+# skills
+.agents/

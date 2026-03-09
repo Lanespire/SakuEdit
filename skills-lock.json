@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "sst-docs": {
+      "source": "moto-taka/agent-skill-sst",
+      "sourceType": "github",
+      "computedHash": "5927323180a27ad4d13925c0fa40e5ce6a17747745d18c3ff4b155203cbf4a81"
+    }
+  }
+}
