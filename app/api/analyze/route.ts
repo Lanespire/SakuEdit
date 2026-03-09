@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
         subtitleSettings: styleAnalysis.subtitleSettings,
         bgmSettings: styleAnalysis.bgmSettings,
         tempoSettings: styleAnalysis.tempoSettings,
+        visualProfile: styleAnalysis.visualProfile as Prisma.InputJsonValue,
       },
     })
 

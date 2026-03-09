@@ -388,6 +388,7 @@ model Style {
   subtitleSettings Json?      // {font: "Noto Sans JP", size: 24, position: "bottom"}
   bgmSettings     Json?       // {genre: "upbeat", volume: 0.3}
   tempoSettings   Json?       // {targetCutsPerMinute: 15, minClipDuration: 2}
+  visualProfile   Json?       // Visual style fingerprint extracted from reference video
 
   // Reference (for learned styles)
   referenceUrl    String?     // YouTube/TikTok URL
