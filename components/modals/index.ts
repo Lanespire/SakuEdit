@@ -1,2 +1,2 @@
-export { default as SubtitleEditModal } from './SubtitleEditModal'
-export { default as ExportSettingsModal } from './ExportSettingsModal'
+export { default as SubtitleEditModal, type Subtitle } from './SubtitleEditModal'
+export { default as ExportSettingsModal, type ExportSettings } from './ExportSettingsModal'

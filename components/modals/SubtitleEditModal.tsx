@@ -2,123 +2,106 @@
 
 import { useState } from 'react'
 
-interface Subtitle {
+// Subtitle type - exported for use in EditPage
+export interface Subtitle {
   id: string
-  startTime: number
-  endTime: number
   text: string
-  style: 'default' | 'youtuber' | 'minimal' | 'bold' | 'outline'
+  startTime?: number  // DB field (seconds)
+  endTime?: number    // DB field (seconds)
+  start?: number     // UI field (milliseconds) - required
+  end?: number       // UI field (milliseconds) - required
+  style?: string
+  animation?: string
+  position?: string
+  fontSize?: number
+  fontColor?: string
+  backgroundColor?: string | null
+  isBold?: boolean
+  highlight?: boolean
+  width?: string
 }
 
 interface SubtitleEditModalProps {
   subtitle: Subtitle
-  isOpen: boolean
-  onClose: () => void
-  onSave: (subtitle: Subtitle) => void
-  onNext: () => void
-  onPrev: () => void
   currentIndex: number
   totalCount: number
+  onClose: () => void
+  onSave: (subtitle: Subtitle) => void
+  onDelete: (id: string) => void
+  onPrev: () => void
+  onNext: () => void
 }
 
 export default function SubtitleEditModal({
   subtitle,
-  isOpen,
-  onClose,
-  onSave,
-  onNext,
-  onPrev,
   currentIndex,
   totalCount,
+  onClose,
+  onSave,
+  onDelete,
+  onPrev,
+  onNext,
 }: SubtitleEditModalProps) {
-  const [text, setText] = useState(subtitle.text)
-  const [startTime, setStartTime] = useState(subtitle.startTime)
-  const [endTime, setEndTime] = useState(subtitle.endTime)
-  const [waveformEnabled, setWaveformEnabled] = useState(false)
+  const [editedSubtitle, setEditedSubtitle] = useState<Subtitle>(subtitle)
+  const [isPlaying, setIsPlaying] = useState(false)
 
-  if (!isOpen) return null
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    const ms = Math.floor((seconds % 1) * 100)
-    return `${mins}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`
+  const formatTime = (ms: number | undefined) => {
+    if (ms === undefined) return '00:00.000'
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    const milliseconds = ms % 1000
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`
   }
 
   const parseTime = (timeStr: string) => {
-    const match = timeStr.match(/(\d+):(\d+)\.?(\d+)?/)
+    const match = timeStr.match(/^(\d{2}):(\d{2})\.(\d{3})$/)
     if (!match) return 0
-    const mins = parseInt(match[1])
-    const secs = parseInt(match[2])
-    const ms = match[3] ? parseInt(match[3].padEnd(2, '0').slice(0, 2)) / 100 : 0
-    return mins * 60 + secs + ms
+    const [, minutes, seconds, ms] = match
+    return parseInt(minutes) * 60000 + parseInt(seconds) * 1000 + parseInt(ms)
   }
 
-  const handleSave = () => {
-    onSave({
-      ...subtitle,
-      text,
-      startTime,
-      endTime,
-    })
-    onClose()
+  const handleTimeChange = (field: 'start' | 'end', value: string) => {
+    const time = parseTime(value)
+    setEditedSubtitle(prev => ({ ...prev, [field]: time }))
   }
+
+  const duration = (editedSubtitle.end ?? 0) - (editedSubtitle.start ?? 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 pointer-events-auto"
-        onClick={onClose}
-        data-test-id="modal-backdrop"
-      />
-
-      {/* Modal */}
-      <div className="pointer-events-auto w-full max-w-[1200px] bg-white dark:bg-[#1a1614] rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col h-[85vh] border-t border-white/10 relative transform transition-transform duration-300 ease-out">
-        {/* Drag Handle */}
-        <div className="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing hover:bg-slate-50 dark:hover:bg-white/5 rounded-t-2xl transition-colors">
-          <div className="w-16 h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full"></div>
-        </div>
-
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-test-id="subtitle-edit-modal">
+      <div className="bg-[#2c1e16] border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between shrink-0 gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="flex items-center gap-2 text-primary">
-              <span className="material-symbols-outlined">tune</span>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary text-2xl">subtitles</span>
+            <h2 className="text-lg font-bold text-white">字幕詳細編集</h2>
+            <div className="flex items-center gap-2 ml-4 text-sm">
+              <span className="text-white/50">#</span>
+              <span className="text-white font-bold">{currentIndex + 1}</span>
+              <span className="text-white/50">/ {totalCount}</span>
             </div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              字幕詳細編集
-            </h2>
-            <span className="text-slate-400 text-sm font-medium pt-1 border-l border-slate-200 dark:border-white/10 pl-4">
-              #{currentIndex + 1} / {totalCount}
-            </span>
           </div>
-
-          {/* Navigation */}
           <div className="flex items-center gap-2">
             <button
               onClick={onPrev}
-              className="flex items-center justify-center h-9 px-4 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 text-sm font-bold transition-colors"
-              data-test-id="prev-subtitle"
+              disabled={currentIndex === 0}
+              className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg disabled:opacity-30 transition-colors"
+              data-test-id="subtitle-edit-prev-button"
             >
-              <span className="material-symbols-outlined text-[18px] mr-1">chevron_left</span>
-              前
+              <span className="material-symbols-outlined">chevron_left</span>
             </button>
             <button
               onClick={onNext}
-              className="flex items-center justify-center h-9 px-4 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 text-sm font-bold transition-colors"
-              data-test-id="next-subtitle"
+              disabled={currentIndex === totalCount - 1}
+              className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg disabled:opacity-30 transition-colors"
+              data-test-id="subtitle-edit-next-button"
             >
-              次
-              <span className="material-symbols-outlined text-[18px] ml-1">chevron_right</span>
+              <span className="material-symbols-outlined">chevron_right</span>
             </button>
-          </div>
-
-          <div className="flex-1 flex justify-end">
             <button
               onClick={onClose}
-              className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 transition-colors"
-              data-test-id="close-modal"
+              className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              data-test-id="subtitle-edit-close-button"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -126,190 +109,195 @@ export default function SubtitleEditModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
-            {/* Left: Preview */}
-            <div className="lg:col-span-4 flex flex-col gap-5">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">preview</span>
-                  プレビュー
-                </label>
-                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-900 group shadow-md border border-slate-200 dark:border-white/5">
-                  <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900"></div>
-                  <div className="absolute inset-0 flex items-end justify-center pb-8 px-8">
-                    <p className="text-white text-lg font-bold drop-shadow-md text-center leading-tight bg-black/40 px-2 py-1 rounded">
-                      {text || '字幕プレビュー'}
-                    </p>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                    <button className="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm hover:bg-primary text-white transition-colors shadow-lg">
-                      <span className="material-symbols-outlined text-[28px]">play_arrow</span>
-                    </button>
-                  </div>
+        <div className="flex flex-col md:flex-row">
+          {/* Left: Preview */}
+          <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-white/10">
+            <div
+              className="relative aspect-video bg-black rounded-xl overflow-hidden mb-4"
+              data-test-id="subtitle-edit-preview"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900"></div>
+              {/* Subtitle overlay */}
+              <div className="absolute bottom-8 left-0 right-0 text-center px-4">
+                <div className="inline-block px-4 py-2 bg-black/70 rounded-lg">
+                  <p className="text-white text-lg font-bold" style={{
+                    textShadow: '2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000'
+                  }}>
+                    {editedSubtitle.text}
+                  </p>
                 </div>
               </div>
-
-              <button className="w-full flex items-center justify-center gap-2 h-12 bg-white dark:bg-white/5 hover:bg-slate-50 dark:hover:bg-white/10 text-slate-900 dark:text-white font-bold rounded-lg transition-colors border border-slate-200 dark:border-white/10 hover:border-primary/50 dark:hover:border-primary/50 group">
-                <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">
-                  play_circle
-                </span>
-                <span>この字幕を再生</span>
-              </button>
-
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-100 dark:border-white/5">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-slate-400">graphic_eq</span>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    波形で微調整
+              {/* Play button */}
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+                data-test-id="subtitle-edit-play-button"
+              >
+                <div className="size-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  <span className="material-symbols-outlined text-white text-3xl">
+                    {isPlaying ? 'pause' : 'play_arrow'}
                   </span>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={waveformEnabled}
-                    onChange={(e) => setWaveformEnabled(e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+              </button>
+            </div>
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="w-full py-2 text-sm text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              この字幕を再生
+            </button>
+          </div>
+
+          {/* Right: Edit Form */}
+          <div className="md:w-1/2 p-6 space-y-6">
+            {/* Text */}
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                字幕テキスト
+              </label>
+              <div className="relative">
+                <textarea
+                  value={editedSubtitle.text}
+                  onChange={(e) => setEditedSubtitle(prev => ({ ...prev, text: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white resize-none focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none"
+                  rows={3}
+                  maxLength={40}
+                  data-test-id="subtitle-edit-textarea"
+                />
+                <div className="absolute bottom-2 right-3 text-xs text-white/50" data-test-id="subtitle-edit-char-count">
+                  {editedSubtitle.text.length} / 40文字
+                </div>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button className="px-3 py-1 text-xs text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5">B</button>
+                <button className="px-3 py-1 text-xs text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5">色</button>
+                <button className="px-3 py-1 text-xs text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5">大</button>
+                <button className="px-3 py-1 text-xs text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5">小</button>
               </div>
             </div>
 
-            {/* Right: Edit Form */}
-            <div className="lg:col-span-8 flex flex-col gap-8">
-              {/* Text Input */}
-              <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-end">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">subtitles</span>
-                    字幕テキスト
-                  </label>
-                  <span className="text-xs text-slate-400 font-medium bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded">
-                    {text.length} / 40文字
-                  </span>
-                </div>
-                <div className="relative group">
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    className="w-full min-h-[120px] p-4 text-lg leading-relaxed rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#2a2420] text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none resize-none transition-shadow font-medium"
-                    placeholder="ここに字幕を入力..."
-                    maxLength={40}
-                    data-test-id="subtitle-text-input"
-                  />
-                  <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-white/10 rounded-lg p-1">
-                    <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 font-bold" title="太字">
-                      B
-                    </button>
-                    <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-1"></div>
-                    <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400" title="文字色">
-                      <span className="material-symbols-outlined text-[20px]">format_color_text</span>
-                    </button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400" title="サイズ">
-                      <span className="material-symbols-outlined text-[20px]">format_size</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Time Inputs */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">schedule</span>
-                    開始時間
-                  </label>
+            {/* Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">開始時間</label>
+                <div className="flex items-center gap-1">
+                  <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
+                    <span className="material-symbols-outlined text-sm">remove</span>
+                  </button>
                   <input
                     type="text"
-                    value={formatTime(startTime)}
-                    onChange={(e) => setStartTime(parseTime(e.target.value))}
-                    className="px-4 py-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#2a2420] text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none font-mono"
-                    data-test-id="start-time-input"
+                    value={formatTime(editedSubtitle.start ?? 0)}
+                    onChange={(e) => handleTimeChange('start', e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-center font-mono text-sm focus:ring-2 focus:ring-primary outline-none"
+                    data-test-id="subtitle-edit-start-time"
                   />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">schedule</span>
-                    終了時間
-                  </label>
-                  <input
-                    type="text"
-                    value={formatTime(endTime)}
-                    onChange={(e) => setEndTime(parseTime(e.target.value))}
-                    className="px-4 py-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#2a2420] text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none font-mono"
-                    data-test-id="end-time-input"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">timer</span>
-                    表示時間
-                  </label>
-                  <div className="px-4 py-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-[#1a1614] text-slate-500 dark:text-slate-400 font-mono">
-                    {(endTime - startTime).toFixed(2)}秒
-                  </div>
+                  <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
+                    <span className="material-symbols-outlined text-sm">add</span>
+                  </button>
                 </div>
               </div>
-
-              {/* Position & Style */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    位置
-                  </label>
-                  <div className="flex gap-2">
-                    {['top', 'middle', 'bottom'].map((pos) => (
-                      <button
-                        key={pos}
-                        className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                          pos === 'bottom'
-                            ? 'bg-primary/10 border-primary text-primary'
-                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-primary/50'
-                        }`}
-                        data-test-id={`position-${pos}`}
-                      >
-                        {pos === 'top' ? '上' : pos === 'middle' ? '中' : '下'}
-                      </button>
-                    ))}
-                  </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">終了時間</label>
+                <div className="flex items-center gap-1">
+                  <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
+                    <span className="material-symbols-outlined text-sm">remove</span>
+                  </button>
+                  <input
+                    type="text"
+                    value={formatTime(editedSubtitle.end ?? 0)}
+                    onChange={(e) => handleTimeChange('end', e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-center font-mono text-sm focus:ring-2 focus:ring-primary outline-none"
+                    data-test-id="subtitle-edit-end-time"
+                  />
+                  <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
+                    <span className="material-symbols-outlined text-sm">add</span>
+                  </button>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    スタイル
-                  </label>
-                  <select
-                    className="px-4 py-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#2a2420] text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none"
-                    data-test-id="style-select"
+              </div>
+            </div>
+            <div className="text-center text-xs text-white/50">
+              長さ: {(duration / 1000).toFixed(2)}秒
+            </div>
+
+            {/* Style */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">スタイル</label>
+                <select
+                  value={editedSubtitle.style || 'standard'}
+                  onChange={(e) => setEditedSubtitle(prev => ({ ...prev, style: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                  data-test-id="subtitle-edit-style-select"
+                >
+                  <option value="standard">標準</option>
+                  <option value="emphasis">強調</option>
+                  <option value="whisper">ささやき</option>
+                  <option value="shout">叫び</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">アニメーション</label>
+                <select
+                  value={editedSubtitle.animation || 'none'}
+                  onChange={(e) => setEditedSubtitle(prev => ({ ...prev, animation: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                  data-test-id="subtitle-edit-animation-select"
+                >
+                  <option value="none">なし</option>
+                  <option value="fadein">フェードイン</option>
+                  <option value="bounce">バウンス</option>
+                  <option value="typewriter">タイプライター</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Position */}
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">配置</label>
+              <div className="grid grid-cols-3 gap-2 w-32" data-test-id="subtitle-edit-position-grid">
+                {['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'].map((pos) => (
+                  <button
+                    key={pos}
+                    onClick={() => setEditedSubtitle(prev => ({ ...prev, position: pos }))}
+                    className={`aspect-square rounded-lg border transition-colors ${
+                      (editedSubtitle.position || 'bottom-center') === pos
+                        ? 'bg-primary border-primary'
+                        : 'bg-white/5 border-white/10 hover:border-white/30'
+                    }`}
                   >
-                    <option value="default">デフォルト</option>
-                    <option value="youtuber">YouTuber風</option>
-                    <option value="minimal">ミニマル</option>
-                    <option value="bold">太字</option>
-                    <option value="outline">枠線</option>
-                  </select>
-                </div>
+                    {(editedSubtitle.position || 'bottom-center') === pos && (
+                      <span className="material-symbols-outlined text-white text-sm">check</span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between shrink-0 bg-white dark:bg-[#1a1614]">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#231810]">
           <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-            data-test-id="cancel-button"
+            onClick={() => onDelete(editedSubtitle.id)}
+            className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
+            data-test-id="subtitle-edit-delete-button"
           >
-            キャンセル
+            <span className="material-symbols-outlined text-sm">delete</span>
+            削除
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex gap-3">
             <button
-              onClick={handleSave}
-              className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-bold rounded-lg shadow-lg shadow-primary/20 transition-colors"
-              data-test-id="save-subtitle"
+              onClick={onClose}
+              className="px-6 py-2 text-sm font-medium text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+              data-test-id="subtitle-edit-cancel-button"
             >
-              <span className="material-symbols-outlined text-[18px]">save</span>
+              キャンセル
+            </button>
+            <button
+              onClick={() => onSave(editedSubtitle)}
+              className="px-6 py-2 text-sm font-bold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-lg shadow-primary/20 transition-colors"
+              data-test-id="subtitle-edit-save-button"
+            >
               保存
             </button>
           </div>

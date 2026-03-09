@@ -2,25 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import SubtitleEditModal from '@/app/components/SubtitleEditModal'
-import ExportModal from '@/app/components/ExportModal'
-
-interface Subtitle {
-  id: string
-  text: string
-  startTime?: number  // DB field name
-  endTime?: number    // DB field name
-  start?: number     // UI field (milliseconds)
-  end?: number       // UI field (milliseconds)
-  style?: string
-  position?: string
-  fontSize?: number
-  fontColor?: string
-  backgroundColor?: string | null
-  isBold?: boolean
-  highlight?: boolean
-  width?: string
-}
+import { SubtitleEditModal, ExportSettingsModal, type Subtitle, type ExportSettings } from '@/components/modals'
 
 interface AISuggestion {
   id: string
@@ -183,13 +165,7 @@ export default function EditPage() {
     setIsSubtitleModalOpen(false)
   }
 
-  const handleExport = async (settings: {
-    quality: string
-    format: string
-    subtitleOption: string
-    removeWatermark: boolean
-    exportThumbnail: boolean
-  }) => {
+  const handleExport = async (settings: ExportSettings) => {
     if (!_projectId) return
 
     setIsExporting(true)
@@ -655,7 +631,7 @@ export default function EditPage() {
 
       {/* Export Modal */}
       {isExportModalOpen && (
-        <ExportModal
+        <ExportSettingsModal
           onClose={() => setIsExportModalOpen(false)}
           onExport={handleExport}
           isPro={false}

@@ -2,292 +2,211 @@
 
 import { useState } from 'react'
 
-interface ExportSettingsModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onExport: (settings: ExportSettings) => void
-  projectId: string
-  projectName: string
-  duration: number
-}
-
-interface ExportSettings {
+export interface ExportSettings {
   quality: '720p' | '1080p' | '4k'
   format: 'mp4' | 'webm' | 'mov'
-  includeSubtitles: boolean
-  subtitleFormat: 'burn-in' | 'srt' | 'both'
-  includeThumbnail: boolean
-  watermark: boolean
+  subtitleOption: 'burn' | 'srt' | 'both'
+  removeWatermark: boolean
+  exportThumbnail: boolean
 }
 
-export default function ExportSettingsModal({
-  isOpen,
-  onClose,
-  onExport,
-  projectId,
-  projectName,
-  duration,
-}: ExportSettingsModalProps) {
+interface ExportSettingsModalProps {
+  onClose: () => void
+  onExport: (settings: ExportSettings) => void
+  isPro?: boolean
+}
+
+export default function ExportSettingsModal({ onClose, onExport, isPro = false }: ExportSettingsModalProps) {
   const [settings, setSettings] = useState<ExportSettings>({
     quality: '720p',
     format: 'mp4',
-    includeSubtitles: true,
-    subtitleFormat: 'burn-in',
-    includeThumbnail: true,
-    watermark: false,
+    subtitleOption: 'burn',
+    removeWatermark: false,
+    exportThumbnail: false,
   })
-  const [isExporting, setIsExporting] = useState(false)
-
-  if (!isOpen) return null
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${String(secs).padStart(2, '0')}`
-  }
 
   const qualityOptions = [
-    { value: '720p', label: '720p HD', description: '1280×720', pro: false },
-    { value: '1080p', label: '1080p FHD', description: '1920×1080', pro: true },
-    { value: '4k', label: '4K Ultra HD', description: '3840×2160', pro: true },
+    { id: '720p', label: '720p HD', size: '~45MB', pro: false },
+    { id: '1080p', label: '1080p Full HD', size: '~120MB', pro: true, recommended: true },
+    { id: '4k', label: '4K Ultra HD', size: '~400MB', pro: true },
   ]
 
   const formatOptions = [
-    { value: 'mp4', label: 'MP4', description: '汎用性が高い' },
-    { value: 'webm', label: 'WebM', description: 'Web最適化' },
-    { value: 'mov', label: 'MOV', description: '高品質' },
+    { id: 'mp4', label: 'MP4' },
+    { id: 'webm', label: 'WebM' },
+    { id: 'mov', label: 'MOV' },
   ]
 
-  const handleExport = async () => {
-    setIsExporting(true)
-    try {
-      await onExport(settings)
-    } finally {
-      setIsExporting(false)
-    }
+  const subtitleOptions = [
+    { id: 'burn', label: '動画に焼き込む' },
+    { id: 'srt', label: '別ファイルで出力(SRT)' },
+    { id: 'both', label: '両方' },
+  ]
+
+  const handleQualityChange = (quality: '720p' | '1080p' | '4k') => {
+    if (quality !== '720p' && !isPro) return
+    setSettings(prev => ({ ...prev, quality }))
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto"
-        onClick={onClose}
-        data-test-id="modal-backdrop"
-      />
-
-      {/* Modal */}
-      <div className="pointer-events-auto w-full max-w-2xl bg-white dark:bg-[#1a1614] rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-test-id="export-modal">
+      <div className="bg-[#2c1e16] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary">file_export</span>
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">書き出し設定</h2>
-              <p className="text-sm text-slate-500">{projectName}</p>
-            </div>
+            <span className="text-2xl">🎬</span>
+            <h2 className="text-lg font-bold text-white">書き出し設定</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-            data-test-id="close-modal"
+            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            data-test-id="export-modal-close-button"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-          {/* Quality Selection */}
+        <div className="p-6 space-y-6">
+          {/* Quality */}
+          <div>
+            <label className="block text-sm font-medium text-white/70 mb-3">解像度</label>
+            <div className="space-y-2">
+              {qualityOptions.map((option) => {
+                const isDisabled = option.pro && !isPro
+                const isSelected = settings.quality === option.id
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => handleQualityChange(option.id as typeof settings.quality)}
+                    disabled={isDisabled}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                      isSelected
+                        ? 'bg-primary/20 border-primary text-white'
+                        : isDisabled
+                        ? 'bg-white/5 border-white/5 text-white/30 cursor-not-allowed'
+                        : 'bg-white/5 border-white/10 text-white hover:border-white/20'
+                    }`}
+                    data-test-id={`export-quality-${option.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`size-5 rounded-full border-2 flex items-center justify-center ${
+                        isSelected ? 'border-primary bg-primary' : 'border-white/30'
+                      }`}>
+                        {isSelected && (
+                          <span className="material-symbols-outlined text-white text-xs">check</span>
+                        )}
+                      </div>
+                      <span className="font-medium">{option.label}</span>
+                      {option.recommended && (
+                        <span className="text-[10px] bg-primary/30 text-primary px-2 py-0.5 rounded">推奨</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-white/50">{option.size}</span>
+                      {option.pro && (
+                        <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">PRO</span>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Format & Subtitle */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">フォーマット</label>
+              <select
+                value={settings.format}
+                onChange={(e) => setSettings(prev => ({ ...prev, format: e.target.value as typeof settings.format }))}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                data-test-id="export-format-select"
+              >
+                {formatOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">字幕</label>
+              <select
+                value={settings.subtitleOption}
+                onChange={(e) => setSettings(prev => ({ ...prev, subtitleOption: e.target.value as typeof settings.subtitleOption }))}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
+              >
+                {subtitleOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Options */}
           <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[18px]">high_quality</span>
-              画質
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {qualityOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setSettings({ ...settings, quality: option.value as ExportSettings['quality'] })}
-                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                    settings.quality === option.value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
-                  }`}
-                  data-test-id={`quality-${option.value}`}
-                >
-                  <div className="font-bold text-slate-900 dark:text-white">{option.label}</div>
-                  <div className="text-xs text-slate-500 mt-1">{option.description}</div>
-                  {option.pro && (
-                    <span className="absolute top-2 right-2 text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
-                      PRO
-                    </span>
+            {/* Watermark */}
+            <label className={`flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl ${!isPro ? 'opacity-60' : 'cursor-pointer hover:bg-white/10'}`}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-white/70">watermark</span>
+                <div>
+                  <p className="text-sm text-white">ウォーターマークを削除</p>
+                  {!isPro && (
+                    <p className="text-xs text-primary">PROにアップグレード</p>
                   )}
-                  {settings.quality === option.value && (
-                    <span className="material-symbols-outlined absolute bottom-2 right-2 text-primary">check_circle</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Format Selection */}
-          <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[18px]">video_file</span>
-              フォーマット
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {formatOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setSettings({ ...settings, format: option.value as ExportSettings['format'] })}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    settings.format === option.value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
-                  }`}
-                  data-test-id={`format-${option.value}`}
-                >
-                  <div className="font-bold text-slate-900 dark:text-white">{option.label}</div>
-                  <div className="text-xs text-slate-500 mt-1">{option.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Subtitle Options */}
-          <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[18px]">subtitles</span>
-              字幕オプション
-            </label>
-            <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 space-y-4">
-              <label className="flex items-center justify-between cursor-pointer">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-white">字幕を含める</div>
-                  <div className="text-sm text-slate-500">動画に字幕を追加</div>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={settings.includeSubtitles}
-                  onChange={(e) => setSettings({ ...settings, includeSubtitles: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
-                  data-test-id="include-subtitles"
-                />
-              </label>
-
-              {settings.includeSubtitles && (
-                <div className="pt-2 border-t border-slate-200 dark:border-white/10">
-                  <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">字幕形式</div>
-                  <div className="flex gap-2">
-                    {[
-                      { value: 'burn-in', label: '動画に焼き込み' },
-                      { value: 'srt', label: 'SRTファイル' },
-                      { value: 'both', label: '両方' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() =>
-                          setSettings({ ...settings, subtitleFormat: option.value as ExportSettings['subtitleFormat'] })
-                        }
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          settings.subtitleFormat === option.value
-                            ? 'bg-primary text-white'
-                            : 'bg-white dark:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10'
-                        }`}
-                        data-test-id={`subtitle-${option.value}`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Additional Options */}
-          <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[18px]">tune</span>
-              その他のオプション
-            </label>
-            <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 space-y-4">
-              <label className="flex items-center justify-between cursor-pointer">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-white">サムネイル画像</div>
-                  <div className="text-sm text-slate-500">最初のフレームをPNGで出力</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={settings.includeThumbnail}
-                  onChange={(e) => setSettings({ ...settings, includeThumbnail: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
-                  data-test-id="include-thumbnail"
-                />
-              </label>
-
-              <label className="flex items-center justify-between cursor-pointer">
-                <div>
-                  <div className="font-medium text-slate-900 dark:text-white">ウォーターマーク</div>
-                  <div className="text-sm text-slate-500">SakuEditロゴを追加</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={settings.watermark}
-                  onChange={(e) => setSettings({ ...settings, watermark: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
-                  data-test-id="include-watermark"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Estimated Size */}
-          <div className="bg-slate-100 dark:bg-white/5 rounded-xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-slate-400">info</span>
-              <div>
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">推定ファイルサイズ</div>
-                <div className="text-xs text-slate-500">動画時間: {formatDuration(duration)}</div>
               </div>
-            </div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white">
-              ~{Math.round(duration * (settings.quality === '4k' ? 50 : settings.quality === '1080p' ? 20 : 10))}MB
-            </div>
+              <input
+                type="checkbox"
+                checked={settings.removeWatermark}
+                disabled={!isPro}
+                onChange={(e) => setSettings(prev => ({ ...prev, removeWatermark: e.target.checked }))}
+                className="size-5 rounded border-white/30 bg-white/5 text-primary focus:ring-primary"
+                data-test-id="export-watermark-checkbox"
+              />
+            </label>
+
+            {/* Thumbnail */}
+            <label className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-white/70">image</span>
+                <div>
+                  <p className="text-sm text-white">サムネイルも書き出す</p>
+                  <p className="text-xs text-white/50">JPG形式で出力</p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.exportThumbnail}
+                onChange={(e) => setSettings(prev => ({ ...prev, exportThumbnail: e.target.checked }))}
+                className="size-5 rounded border-white/30 bg-white/5 text-primary focus:ring-primary"
+                data-test-id="export-thumbnail-checkbox"
+              />
+            </label>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between shrink-0 bg-white dark:bg-[#1a1614]">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-            data-test-id="cancel-button"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-bold rounded-lg shadow-lg shadow-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            data-test-id="export-button"
-          >
-            {isExporting ? (
-              <>
-                <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
-                書き出し中...
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                書き出し開始
-              </>
-            )}
-          </button>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#231810]">
+          <p className="text-sm text-white/50">
+            予想時間: <span className="text-white font-medium">約2分30秒</span>
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 text-sm font-medium text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+              data-test-id="export-cancel-button"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={() => onExport(settings)}
+              className="px-6 py-2 text-sm font-bold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-lg shadow-primary/20 transition-colors"
+              data-test-id="export-start-button"
+            >
+              書き出しを開始
+            </button>
+          </div>
         </div>
       </div>
     </div>

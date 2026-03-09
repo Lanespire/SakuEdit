@@ -20,21 +20,21 @@ export function ScrollReveal({
   className = ''
 }: ScrollRevealProps) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const isInView = useInView(ref, { once: true, margin: '-50px' });
 
   const directionOffset = {
-    up: { y: 60 },
-    down: { y: -60 },
-    left: { x: 60 },
-    right: { x: -60 },
+    up: { y: 30 },
+    down: { y: -30 },
+    left: { x: 30 },
+    right: { x: -30 },
   };
 
   return (
     <motion.div
       ref={ref}
       initial={{ opacity: 0, ...directionOffset[direction] }}
-      animate={isInView ? { opacity: 1, x: 0, y: 0 } : {}}
-      transition={{ duration: 0.6, delay, ease: [0.25, 0.4, 0.25, 1] }}
+      animate={isInView ? { opacity: 1, x: 0, y: 0 } : { opacity: 0, ...directionOffset[direction] }}
+      transition={{ duration: 0.5, delay, ease: 'easeOut' }}
       className={className}
     >
       {children}
@@ -134,11 +134,11 @@ export function StaggerItem({ children, className = '' }: StaggerItemProps) {
   return (
     <motion.div
       variants={{
-        hidden: { opacity: 0, y: 30 },
+        hidden: { opacity: 0, y: 20 },
         visible: {
           opacity: 1,
           y: 0,
-          transition: { duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }
+          transition: { duration: 0.4, ease: 'easeOut' }
         },
       }}
       className={className}
@@ -303,9 +303,23 @@ interface ParallaxProps {
 
 export function Parallax({ children, speed = 0.5, className = '' }: ParallaxProps) {
   const ref = useRef(null);
-  const { scrollYProgress } = useMotionValue({});
+  const scrollYProgress = useMotionValue(0);
 
   const y = useTransform(scrollYProgress, [0, 1], [0, speed * 100]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (ref.current) {
+        const element = ref.current as HTMLElement;
+        const rect = element.getBoundingClientRect();
+        const scrollProgress = (window.innerHeight - rect.top) / (window.innerHeight + rect.height);
+        scrollYProgress.set(Math.max(0, Math.min(1, scrollProgress)));
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [scrollYProgress]);
 
   return (
     <motion.div ref={ref} style={{ y }} className={className}>
