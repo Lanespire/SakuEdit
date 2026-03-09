@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html class="light" lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>スタイル分析中 - SakuEdit</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#F97316", // SakuEdit Orange
+                        "primary-hover": "#ea580c",
+                        "background-light": "#fdfdfd",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "Noto Sans JP", "sans-serif"],
+                        "sans": ["Inter", "Noto Sans JP", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>.text-stroke-black {
+            text-shadow: 
+                -2px -2px 0 #000,  
+                 2px -2px 0 #000,
+                -2px  2px 0 #000,
+                 2px  2px 0 #000;
+        }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin-slow 3s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#0d141b] dark:text-white font-display min-h-screen flex flex-col overflow-x-hidden">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e7edf3] dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-3 sticky top-0 z-50">
+<div class="flex items-center gap-4">
+<button class="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-[#0d141b] dark:text-white text-2xl">arrow_back</span>
+</button>
+<h2 class="text-[#0d141b] dark:text-white text-lg font-bold leading-tight">スタイルを学習中...</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center rounded-xl h-10 w-10 bg-[#e7edf3] dark:bg-slate-800 text-[#0d141b] dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+</header>
+<main class="flex-1 flex justify-center w-full p-4 md:p-8 lg:p-12">
+<div class="w-full max-w-[1200px] flex flex-col gap-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<div class="lg:col-span-5 flex flex-col gap-4">
+<div class="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 h-full">
+<div class="relative w-full aspect-video rounded-lg overflow-hidden group cursor-pointer mb-4">
+<div class="w-full h-full bg-cover bg-center" data-alt="Video thumbnail showing a brightly lit studio setup often used by YouTubers" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDAGcav80fzRFXHM0DhKbiOlOKff27nC1g2_mAJIqMdx_shM5quJ6smpXa0Hx51cXR8OO26PkW92s4GXMZJALVQK8z2Knj9Za_w4hKLdy0aHgUC_Do1qyyPdKamh5FCF1vE0UMaJck4ov57TwH1bx3jxFbfECGUgoXVQliK7uLcB6VnxcvAWDF4hTHSpQmBLnRbGxZ-Uu_unIxAzPJMnrubqrEL44lVQPKFXgMGI3NnoexB3L93-KVkRrF2h6LQopMjx8NdRAvzxJEV');"></div>
+<div class="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-6xl opacity-80 group-hover:opacity-100 transition-opacity">play_circle</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<div class="inline-flex items-center gap-2">
+<span class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-1 rounded font-medium">参考動画</span>
+</div>
+<h3 class="text-lg font-bold leading-tight text-slate-900 dark:text-white">【神回】〇〇やってみた！驚きの結末に...</h3>
+<div class="flex items-center gap-2 mt-1">
+<div class="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+<img alt="Channel Avatar" class="w-full h-full object-cover" data-alt="Avatar of the channel owner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgM1Sz4U33NOc-F8kMMWjEn5VWPJeRKIDkBiBhUiZJWPeW0C3_RwuJJMI71X3VrVNS1s7wVeSl1dPEjaNxRUAkVDQTeU_ibuVtzCbx4gEhwHLjEri9AQdjh7EdX5DYigzNt6Vyt5JbMhuGXIRIaq1v6uvpjv2-9GqyWrOnbTmMPlOLNgUQAXL-coR04Tn6RKdFClLbMDWkPrnSwaG-il9eCOksrqD9lmbf8IqOY3yJVJyF-6MCcVON4cy6WLk8C9wyrG-KETyTxkaR"/>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Taka Channel</p>
+</div>
+<div class="mt-4 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 rounded-lg flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-xl mt-0.5">info</span>
+<p class="text-sm text-slate-700 dark:text-slate-300">
+                                    この動画の編集スタイル（字幕、テンポ、色使い）をAIが分析しています。完了までしばらくお待ちください。
+                                </p>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-7 flex flex-col gap-6">
+<div class="flex items-center gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+<div class="relative flex items-center justify-center">
+<div class="absolute w-full h-full rounded-full border-4 border-slate-100 dark:border-slate-800"></div>
+<div class="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+</div>
+<h2 class="text-2xl font-bold text-slate-900 dark:text-white">AIがスタイルを学習中...</h2>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all">
+<div class="flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 shrink-0 w-10 h-10 text-primary">
+<span class="material-symbols-outlined text-2xl">check</span>
+</div>
+<div class="flex flex-1 flex-col justify-center">
+<p class="text-slate-900 dark:text-white text-base font-bold leading-normal">字幕スタイルを検出</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal mt-1">白文字 + 黒縁取り, 画面下部, バウンスアニメーション</p>
+</div>
+</div>
+<div class="flex gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all">
+<div class="flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 shrink-0 w-10 h-10 text-primary">
+<span class="material-symbols-outlined text-2xl">check</span>
+</div>
+<div class="flex flex-1 flex-col justify-center">
+<p class="text-slate-900 dark:text-white text-base font-bold leading-normal">カットのテンポを分析</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal mt-1">平均シーン長: 3.2秒, ジャンプカット多用</p>
+</div>
+</div>
+<div class="flex gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all">
+<div class="flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 shrink-0 w-10 h-10 text-primary">
+<span class="material-symbols-outlined text-2xl">check</span>
+</div>
+<div class="flex flex-1 flex-col justify-center">
+<p class="text-slate-900 dark:text-white text-base font-bold leading-normal">テロップパターンを学習</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal mt-1">強調ワード: 黄色ハイライト, 効果音連動</p>
+</div>
+</div>
+<div class="flex gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-md border border-primary/20 dark:border-primary/40 ring-1 ring-primary/10 dark:ring-primary/20 transition-all">
+<div class="flex items-center justify-center rounded-full bg-primary/10 shrink-0 w-10 h-10 text-primary">
+<span class="material-symbols-outlined text-2xl animate-spin-slow">sync</span>
+</div>
+<div class="flex flex-1 flex-col justify-center">
+<p class="text-slate-900 dark:text-white text-base font-bold leading-normal">BGM/SE傾向を分析中...</p>
+<p class="text-primary text-sm font-medium leading-normal mt-1 animate-pulse-slow">アップテンポ, 場面転換でSE...</p>
+</div>
+</div>
+<div class="flex gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-transparent opacity-60">
+<div class="flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 shrink-0 w-10 h-10 text-slate-400">
+<span class="material-symbols-outlined text-2xl">hourglass_empty</span>
+</div>
+<div class="flex flex-1 flex-col justify-center">
+<p class="text-slate-700 dark:text-slate-300 text-base font-medium leading-normal">サムネイル構図を分析...</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-4">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary text-2xl">auto_fix</span>
+<h3 class="text-xl font-bold text-slate-900 dark:text-white">学習したスタイル概要</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-slate-900 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-3">
+<span class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">字幕プレビュー</span>
+<div class="relative w-full aspect-[16/9] rounded-lg bg-slate-200 dark:bg-slate-800 overflow-hidden flex items-end justify-center pb-6">
+<div class="absolute inset-0 bg-cover bg-center opacity-50" data-alt="Abstract blurred background to represent video content" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD49qnKhxIUmrzoBNTriEV3KEicJJ4IXAx3lhqv9ISr5mGj8v3jSB7IfGSuL3Rs0-UYEB2RGqdlx6tXmlgLJ7OfT3w8Z984pggYVit3T_DJ4pzUz68PuXtgdaygygZyqaXopXjAtRbuPqyp60vWbCTjvqDUUBquu5TZYwYjEC_W2CgBCP6VYRtoC5tos4fMJGu_OUWzNMchyEv5Kad5VKITlMoU8CY2huul9gkVtvw8Bg3hFawUUJe6IVewUdmezEGqf0kNRCOX1XZ-');"></div>
+<div class="relative z-10 text-2xl md:text-3xl font-black text-white text-stroke-black text-center px-4 leading-tight">
+                                こんな感じで<br/><span class="text-[#FFD700]">字幕が入ります</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-3">
+<span class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">カットテンポ</span>
+<div class="flex-1 flex items-end justify-between gap-1 px-2 pb-2 h-32 md:h-auto min-h-[140px]">
+<div class="w-1/12 bg-orange-400/30 rounded-t-sm h-[40%]"></div>
+<div class="w-1/12 bg-orange-400/40 rounded-t-sm h-[60%]"></div>
+<div class="w-1/12 bg-primary rounded-t-sm h-[90%]"></div>
+<div class="w-1/12 bg-amber-400/60 rounded-t-sm h-[30%]"></div>
+<div class="w-1/12 bg-orange-400/40 rounded-t-sm h-[50%]"></div>
+<div class="w-1/12 bg-primary/80 rounded-t-sm h-[80%]"></div>
+<div class="w-1/12 bg-amber-400/30 rounded-t-sm h-[45%]"></div>
+<div class="w-1/12 bg-orange-400/50 rounded-t-sm h-[70%]"></div>
+<div class="w-1/12 bg-amber-400/20 rounded-t-sm h-[20%]"></div>
+<div class="w-1/12 bg-primary/70 rounded-t-sm h-[65%]"></div>
+</div>
+<div class="text-xs text-slate-500 text-center">平均シーン長: 3.2秒 (High Pace)</div>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-3">
+<span class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">抽出カラーパレット</span>
+<div class="flex-1 flex flex-col justify-center gap-4 min-h-[140px]">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-[#FFD700] shadow-sm ring-2 ring-offset-2 ring-[#FFD700]/50 dark:ring-offset-slate-900"></div>
+<div>
+<p class="font-mono text-xs text-slate-500">#FFD700</p>
+<p class="text-sm font-medium dark:text-white">強調 (Highlight)</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-[#EA580C] shadow-sm ring-2 ring-offset-2 ring-[#EA580C]/50 dark:ring-offset-slate-900"></div>
+<div>
+<p class="font-mono text-xs text-slate-500">#EA580C</p>
+<p class="text-sm font-medium dark:text-white">ツッコミ (Accent)</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-[#F97316] shadow-sm ring-2 ring-offset-2 ring-[#F97316]/50 dark:ring-offset-slate-900"></div>
+<div>
+<p class="font-mono text-xs text-slate-500">#F97316</p>
+<p class="text-sm font-medium dark:text-white">ベース (Main)</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

@@ -1,64 +1,158 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useSession } from '@/lib/auth-client'
 
 export default function HomePage() {
-  const [isDragging, setIsDragging] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const router = useRouter()
+  const { data: session } = useSession()
+  const [isDragging, setIsDragging] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [referenceUrl, setReferenceUrl] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [error, setError] = useState('')
 
   const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault()
+    e.stopPropagation()
     if (e.type === 'dragenter' || e.type === 'dragover') {
-      setIsDragging(true);
+      setIsDragging(true)
     } else if (e.type === 'dragleave') {
-      setIsDragging(false);
+      setIsDragging(false)
     }
-  };
+  }
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
 
-    const files = Array.from(e.dataTransfer.files);
-    const videoFile = files.find(file => file.type.startsWith('video/'));
+    const files = Array.from(e.dataTransfer.files)
+    const videoFile = files.find((file) => file.type.startsWith('video/'))
     if (videoFile) {
-      setSelectedFile(videoFile);
+      setSelectedFile(videoFile)
+      setYoutubeUrl('')
     }
-  };
+  }
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    const files = e.target.files
     if (files && files[0]) {
-      setSelectedFile(files[0]);
+      setSelectedFile(files[0])
+      setYoutubeUrl('')
     }
-  };
+  }
+
+  const handleUpload = async () => {
+    if (!selectedFile && !youtubeUrl) {
+      setError('動画ファイルまたはURLを入力してください')
+      return
+    }
+
+    setIsUploading(true)
+    setError('')
+    setUploadProgress(0)
+
+    try {
+      // プロジェクト作成
+      const projectRes = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: selectedFile?.name || 'YouTube Project',
+        }),
+      })
+
+      if (!projectRes.ok) {
+        throw new Error('プロジェクトの作成に失敗しました')
+      }
+
+      const project = await projectRes.json()
+      setUploadProgress(20)
+
+      // ファイルアップロード（動画ファイルまたはYouTube URLの場合）
+      const formData = new FormData()
+      formData.append('projectId', project.id)
+
+      if (selectedFile) {
+        formData.append('file', selectedFile)
+        formData.append('sourceType', 'upload')
+      } else if (youtubeUrl) {
+        formData.append('url', youtubeUrl)
+        formData.append('sourceType', 'youtube')
+      }
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json().catch(() => ({}))
+        throw new Error(errorData.error || 'ファイルのアップロードに失敗しました')
+      }
+
+      setUploadProgress(60)
+
+      // 参考動画の分析（ある場合）
+      if (referenceUrl) {
+        await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: project.id,
+            referenceUrl,
+          }),
+        })
+      }
+
+      setUploadProgress(80)
+
+      // 処理中画面へ遷移（YouTube URLの場合は非同期処理中）
+      // ファイルアップロードの場合も一旦processingへ
+      router.push(`/processing/${project.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'エラーが発生しました')
+    } finally {
+      setIsUploading(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background-light dark:bg-background-dark">
       {/* Navigation */}
-      <nav className="border-b border-border backdrop-blur-sm bg-background/80 sticky top-0 z-50">
+      <nav className="border-b border-[#f0e6df] dark:border-[#3a2a20] backdrop-blur-sm bg-white/80 dark:bg-[#231810]/80 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">S</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                SakuEdit
-              </span>
+            <Link href="/" className="flex items-center gap-2" data-test-id="header-logo">
+              <span className="text-2xl">🎬</span>
+              <span className="text-xl font-bold text-[#2d1f18] dark:text-white">SakuEdit</span>
             </Link>
             <div className="flex items-center gap-4">
-              <Link href="/projects" className="text-muted hover:text-foreground transition-colors">
+              <Link
+                href="/projects"
+                className="text-sm text-[#8a756b] hover:text-primary transition-colors"
+                data-test-id="projects-link"
+              >
                 プロジェクト
               </Link>
-              <button className="w-10 h-10 bg-surface rounded-full flex items-center justify-center hover:bg-surface-hover transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </button>
+              {session ? (
+                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
+                  {session.user?.name?.[0] || 'U'}
+                </div>
+              ) : (
+                <Link
+                  href="/auth/signin"
+                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
+                  data-test-id="login-link"
+                >
+                  ログイン
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -67,23 +161,32 @@ export default function HomePage() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">新しいプロジェクト</h1>
-          <p className="text-muted text-lg">
+          <h1 className="text-4xl font-bold text-[#2d1f18] dark:text-white mb-4">
+            新しいプロジェクト
+          </h1>
+          <p className="text-[#8a756b] text-lg">
             動画をアップロードして、AIで自動編集を始めましょう
           </p>
         </div>
 
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Upload Area */}
         <div
-          className={`relative border-2 border-dashed rounded-2xl p-12 transition-all ${
+          className={`relative border-2 border-dashed rounded-2xl p-8 transition-all ${
             isDragging
               ? 'border-primary bg-primary/10'
-              : 'border-border bg-surface hover:border-primary/50'
+              : 'border-[#f0e6df] dark:border-[#3a2a20] bg-white dark:bg-[#2a1d15] hover:border-primary/50'
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
+          data-test-id="landing-upload-area"
         >
           <input
             type="file"
@@ -98,84 +201,149 @@ export default function HomePage() {
               htmlFor="video-upload"
               className="flex flex-col items-center justify-center cursor-pointer"
             >
-              <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mb-6">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
+              <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-white text-3xl">
+                  cloud_upload
+                </span>
               </div>
-              <h3 className="text-2xl font-bold mb-2">動画をアップロード</h3>
-              <p className="text-muted mb-4">
+              <h3 className="text-xl font-bold text-[#2d1f18] dark:text-white mb-2">
+                動画をアップロード
+              </h3>
+              <p className="text-[#8a756b] text-sm mb-4">
                 ドラッグ&ドロップまたはクリックして選択
               </p>
-              <div className="px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors">
-                ファイルを選択
-              </div>
-              <p className="text-sm text-muted mt-6">
+              <p className="text-xs text-[#8a756b]">
                 対応形式: MP4, MOV, AVI（最大2GB）
               </p>
             </label>
           ) : (
             <div className="flex flex-col items-center">
-              <div className="w-20 h-20 bg-success/20 rounded-2xl flex items-center justify-center mb-6">
-                <svg className="w-10 h-10 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold mb-2">{selectedFile.name}</h3>
-              <p className="text-muted mb-6">
+              <span className="material-symbols-outlined text-primary text-5xl mb-4">
+                check_circle
+              </span>
+              <h3 className="text-lg font-bold text-[#2d1f18] dark:text-white mb-1">
+                {selectedFile.name}
+              </h3>
+              <p className="text-[#8a756b] text-sm mb-4">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setSelectedFile(null)}
-                  className="px-6 py-3 bg-surface border border-border text-foreground rounded-lg font-medium hover:bg-surface-hover transition-colors"
-                >
-                  変更
-                </button>
-                <Link
-                  href="/styles"
-                  className="px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:shadow-lg transition-all"
-                >
-                  次へ: スタイル選択 →
-                </Link>
-              </div>
+              <button
+                onClick={() => setSelectedFile(null)}
+                className="text-sm text-primary hover:underline"
+              >
+                ファイルを変更
+              </button>
             </div>
           )}
         </div>
 
+        {/* URL Input */}
+        <div className="mt-6">
+          <div className="flex items-center gap-4 mb-3">
+            <div className="flex-1 h-px bg-[#f0e6df] dark:bg-[#3a2a20]" />
+            <span className="text-sm text-[#8a756b]">または</span>
+            <div className="flex-1 h-px bg-[#f0e6df] dark:bg-[#3a2a20]" />
+          </div>
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8a756b]">
+              link
+            </span>
+            <input
+              type="url"
+              value={youtubeUrl}
+              onChange={(e) => {
+                setYoutubeUrl(e.target.value)
+                if (e.target.value) setSelectedFile(null)
+              }}
+              placeholder="YouTube / TikTok URLを入力"
+              className="w-full pl-12 pr-4 py-4 rounded-xl border border-[#f0e6df] dark:border-[#3a2a20] bg-white dark:bg-[#2a1d15] text-[#2d1f18] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none"
+              data-test-id="landing-url-input"
+            />
+          </div>
+        </div>
+
+        {/* Reference Video Section */}
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined text-primary">auto_awesome</span>
+            <h3 className="font-bold text-[#2d1f18] dark:text-white">参考動画（スタイル学習）</h3>
+            <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs font-bold rounded">PRO</span>
+          </div>
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8a756b]">
+              smart_display
+            </span>
+            <input
+              type="url"
+              value={referenceUrl}
+              onChange={(e) => setReferenceUrl(e.target.value)}
+              placeholder="参考にしたいYouTube動画のURL"
+              className="w-full pl-12 pr-4 py-4 rounded-xl border border-primary/30 dark:border-primary/20 bg-primary/5 dark:bg-primary/10 text-[#2d1f18] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none"
+              data-test-id="landing-reference-url-input"
+            />
+          </div>
+          <p className="mt-2 text-xs text-[#8a756b]">
+            好きなYouTuberの編集スタイルを学習して、あなたの動画に適用します
+          </p>
+        </div>
+
+        {/* Upload Progress */}
+        {isUploading && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-[#2d1f18] dark:text-white">
+                アップロード中...
+              </span>
+              <span className="text-sm text-[#8a756b]">{uploadProgress}%</span>
+            </div>
+            <div className="h-2 bg-[#f4ece6] dark:bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Start Button */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={handleUpload}
+            disabled={isUploading || (!selectedFile && !youtubeUrl)}
+            className="px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white font-bold text-lg rounded-xl shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            data-test-id="landing-start-editing-button"
+          >
+            {isUploading ? (
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] animate-spin">sync</span>
+                処理中...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined">auto_fix_high</span>
+                AIで編集をはじめる
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Quick Start Guide */}
         <div className="mt-16 grid md:grid-cols-3 gap-6">
-          <div className="text-center">
-            <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-primary font-bold text-xl">1</span>
+          {[
+            { num: '1', title: '動画アップロード', desc: '編集したい素材動画を選択', icon: 'upload' },
+            { num: '2', title: 'スタイル選択', desc: '好きなクリエイターのスタイルを学習', icon: 'palette' },
+            { num: '3', title: 'AI自動編集', desc: '学習したスタイルで自動編集完了', icon: 'auto_awesome' },
+          ].map((step) => (
+            <div key={step.num} className="text-center p-6 bg-white dark:bg-[#2a1d15] rounded-xl border border-[#f0e6df] dark:border-[#3a2a20]">
+              <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-white font-bold text-xl">{step.num}</span>
+              </div>
+              <h3 className="font-bold text-[#2d1f18] dark:text-white mb-2">{step.title}</h3>
+              <p className="text-sm text-[#8a756b]">{step.desc}</p>
             </div>
-            <h3 className="font-bold mb-2">動画アップロード</h3>
-            <p className="text-sm text-muted">
-              編集したい素材動画を選択
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-secondary/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-secondary font-bold text-xl">2</span>
-            </div>
-            <h3 className="font-bold mb-2">スタイル選択</h3>
-            <p className="text-sm text-muted">
-              好きなクリエイターのスタイルを学習
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-accent font-bold text-xl">3</span>
-            </div>
-            <h3 className="font-bold mb-2">AI自動編集</h3>
-            <p className="text-sm text-muted">
-              学習したスタイルで自動編集完了
-            </p>
-          </div>
+          ))}
         </div>
       </main>
     </div>
-  );
+  )
 }

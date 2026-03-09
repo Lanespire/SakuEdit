@@ -1,11 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function StylesPage() {
+function StylesPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get('projectId')
+
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
+  const [error, setError] = useState('');
 
   const presetStyles = [
     {
@@ -27,6 +34,77 @@ export default function StylesPage() {
       thumbnail: '📚',
     },
   ];
+
+  const handleStartProcessing = async () => {
+    if (!projectId) {
+      setError('プロジェクトIDが見つかりません');
+      return;
+    }
+
+    if (!selectedStyle && !youtubeUrl) {
+      setError('スタイルを選択するか、YouTube URLを入力してください');
+      return;
+    }
+
+    setIsStarting(true);
+    setError('');
+
+    try {
+      // カスタムスタイル学習の場合は分析APIを呼び出す
+      if (youtubeUrl) {
+        const analyzeRes = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            referenceUrl: youtubeUrl,
+          }),
+        });
+
+        if (!analyzeRes.ok) {
+          throw new Error('スタイル分析に失敗しました');
+        }
+      }
+
+      // 処理を開始（プリセットまたは学習済みスタイルを適用）
+      const processRes = await fetch('/api/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          styleId: selectedStyle,
+          customStyleUrl: youtubeUrl,
+          options: {
+            silenceThreshold: -35,
+            silenceDuration: 0.5,
+            subtitles: [],
+            quality: '720p',
+            format: 'mp4',
+            watermark: false,
+          },
+        }),
+      });
+
+      if (!processRes.ok) {
+        const errorData = await processRes.json().catch(() => ({}));
+        throw new Error(errorData.error || '処理の開始に失敗しました');
+      }
+
+      // 処理中画面へ遷移
+      router.push(`/processing/${projectId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'エラーが発生しました');
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  // プロジェクトIDがない場合はホームへ戻る
+  useEffect(() => {
+    if (!projectId) {
+      router.push('/home');
+    }
+  }, [projectId, router]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -122,18 +200,46 @@ export default function StylesPage() {
           >
             戻る
           </Link>
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+              {error}
+            </div>
+          )}
           <button
-            disabled={!selectedStyle && !youtubeUrl}
+            disabled={isStarting || (!selectedStyle && !youtubeUrl)}
+            onClick={handleStartProcessing}
             className={`px-8 py-4 rounded-xl font-bold text-lg transition-all ${
               selectedStyle || youtubeUrl
                 ? 'bg-gradient-to-r from-primary to-secondary text-white hover:shadow-xl hover:shadow-primary/50'
                 : 'bg-surface text-muted cursor-not-allowed'
-            }`}
+            } ${isStarting ? 'opacity-50 cursor-wait' : ''}`}
           >
-            次へ: AI処理開始 →
+            {isStarting ? (
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] animate-spin">sync</span>
+                処理を開始中...
+              </span>
+            ) : (
+              '次へ: AI処理開始 →'
+            )}
           </button>
         </div>
       </main>
     </div>
+  );
+}
+
+export default function StylesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <span className="material-symbols-outlined text-4xl animate-spin text-primary">sync</span>
+          <p className="text-muted">読み込み中...</p>
+        </div>
+      </div>
+    }>
+      <StylesPageContent />
+    </Suspense>
   );
 }

@@ -1,0 +1,489 @@
+// SakuEdit - Prisma Schema
+// Database: SQLite (開発用), PostgreSQL (本番推奨)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Authentication
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  projects      Project[]
+  styles        Style[]
+  subscription  Subscription?
+  usageLogs     UsageLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  providerType      String?
+  providerId        String
+  providerAccountId String   @default("")
+  refreshToken      String?
+  accessToken       String?
+  expiresAt         DateTime?
+  tokenType         String?
+  scope             String?
+  idToken           String?
+  sessionState      String?
+  password          String?   // For credential authentication
+  accountId         String?   // Better Auth uses this field
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  identifier String
+  token      String   @unique
+  expiresAt  DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// Subscription & Billing (指摘#1対応)
+// ============================================
+
+model Subscription {
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  planId          String
+  status          SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd DateTime
+  cancelAtPeriodEnd Boolean       @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Stripe/Payment integration
+  stripeCustomerId    String?
+  stripeSubscriptionId String?
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan            Plan            @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  TRIALING
+}
+
+model Plan {
+  id              String    @id @default(cuid())
+  name            String    @unique  // free, pro, business, enterprise
+  displayName     String
+  price           Int       // in yen
+  interval        String    @default("month") // month, year
+
+  // Limits - 新料金設計に対応
+  maxSingleVideoMinutes    Int       @default(10)   // 1本あたりの最大分数
+  monthlyProcessingMinutes  Int       @default(90)   // 月間処理分数
+  monthlyStyleAnalysisCount Int       @default(0)    // 月間スタイル分析回数
+  styleSlots              Int       @default(3)    // 保存スタイル数
+  maxQuality              String    @default("720p") // 720p, 1080p, 4k
+  hasWatermark            Boolean   @default(true)
+  hasSrtExport            Boolean   @default(false)
+  hasThumbnail            Boolean   @default(false)
+  hasPriorityQueue        Boolean   @default(false)
+  teamSeats              Int       @default(0)    // チーム席数（0=なし）
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  subscriptions   Subscription[]
+
+  @@map("plans")
+}
+
+// ============================================
+// Project & Video
+// ============================================
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  status      ProjectStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Processing progress (指摘#3対応)
+  progress    Int           @default(0)
+  progressMessage String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  canceledAt  DateTime?
+  retryCount  Int           @default(0)
+  lastError   String?
+
+  // Relations
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videos      Video[]
+  subtitles   Subtitle[]
+  exportJobs  ExportJob[]
+  analysisJobs AnalysisJob[]
+  timeline    Timeline?
+  markers     Marker[]
+  undoHistory UndoSnapshot[]
+  aiSuggestions AISuggestion[]
+  styleId     String?
+  style       Style?        @relation(fields: [styleId], references: [id])
+
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  DRAFT       // 下書き
+  UPLOADING   // アップロード中
+  ANALYZING   // スタイル分析中
+  QUEUED      // キュー待ち
+  PROCESSING  // 処理中
+  EXPORTING   // 書き出し中
+  COMPLETED   // 完了
+  ERROR       // エラー
+  CANCELED    // キャンセル
+}
+
+model Video {
+  id              String    @id @default(cuid())
+  projectId       String
+  sourceType      String    @default("upload") // upload, youtube, tiktok
+  filename        String
+  originalUrl     String?
+  storagePath     String?
+  duration        Float     // seconds
+  width           Int?
+  height          Int?
+  fileSize        Int       // bytes
+  mimeType        String
+  thumbnailUrl    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Processing results
+  silenceDetected Json?    // Array of silence segments [{start, end}]
+  highlights       Json?    // Array of highlight timestamps
+  waveform         Json?    // Audio waveform data for visualization
+
+  // Relations
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("videos")
+}
+
+// ============================================
+// Analysis Job (指摘#3対応 - スタイル分析ジョブ)
+// ============================================
+
+model AnalysisJob {
+  id              String          @id @default(cuid())
+  projectId       String
+  status          JobStatus       @default(PENDING)
+  progress        Int             @default(0)
+  progressMessage String?
+  referenceUrl    String?         // YouTube/TikTok URL for style learning
+  result          Json?           // Analysis results
+  error           String?
+  createdAt       DateTime        @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  canceledAt      DateTime?
+
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("analysis_jobs")
+}
+
+// ============================================
+// Subtitle
+// ============================================
+
+model Subtitle {
+  id          String        @id @default(cuid())
+  projectId   String
+  startTime   Float         // seconds
+  endTime     Float         // seconds
+  text        String
+  style       SubtitleStyle @default(default)
+  position    String        @default("bottom") // bottom, top, middle
+  fontSize    Int           @default(24)
+  fontColor   String        @default("#FFFFFF")
+  backgroundColor String?
+  isBold      Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("subtitles")
+}
+
+enum SubtitleStyle {
+  default
+  youtuber
+  minimal
+  bold
+  outline
+}
+
+// ============================================
+// Timeline & Editing (指摘#2対応)
+// ============================================
+
+model Timeline {
+  id              String        @id @default(cuid())
+  projectId       String        @unique
+  zoomLevel       Float         @default(1.0)
+  scrollPosition  Float         @default(0)
+  currentTime     Float         @default(0)
+  isPlaying       Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tracks          TimelineTrack[]
+
+  @@map("timelines")
+}
+
+model TimelineTrack {
+  id          String      @id @default(cuid())
+  timelineId  String
+  type        TrackType
+  name        String
+  order       Int         @default(0)
+  isMuted     Boolean     @default(false)
+  isLocked    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  timeline    Timeline    @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  clips       ClipSegment[]
+
+  @@map("timeline_tracks")
+}
+
+enum TrackType {
+  VIDEO
+  AUDIO
+  SUBTITLE
+  EFFECT
+}
+
+model ClipSegment {
+  id          String    @id @default(cuid())
+  trackId     String
+  sourceId    String?   // Reference to Video or Subtitle
+  startTime   Float     // Track start time
+  endTime     Float     // Track end time
+  sourceStart Float?    // Source media start time
+  sourceEnd   Float?    // Source media end time
+  name        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  track       TimelineTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@map("clip_segments")
+}
+
+model Marker {
+  id          String    @id @default(cuid())
+  projectId   String
+  time        Float     // Position in seconds
+  type        String    @default("custom") // scene_change, cut_point, highlight, custom
+  label       String?
+  color       String    @default("#f97415")
+  createdAt   DateTime  @default(now())
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("markers")
+}
+
+model UndoSnapshot {
+  id          String    @id @default(cuid())
+  projectId   String
+  snapshot    Json      // Serialized timeline state
+  description String?
+  createdAt   DateTime  @default(now())
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("undo_snapshots")
+}
+
+// ============================================
+// Style Template
+// ============================================
+
+model Style {
+  id              String      @id @default(cuid())
+  userId          String?
+  name            String
+  description     String?
+  category        String      @default("custom") // preset, custom, learned
+  isPublic        Boolean     @default(false)
+  usageCount      Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Style settings
+  cutSettings     Json?       // {minSilence: 0.3, aggressiveness: "medium"}
+  subtitleSettings Json?      // {font: "Noto Sans JP", size: 24, position: "bottom"}
+  bgmSettings     Json?       // {genre: "upbeat", volume: 0.3}
+  tempoSettings   Json?       // {targetCutsPerMinute: 15, minClipDuration: 2}
+
+  // Reference (for learned styles)
+  referenceUrl    String?     // YouTube/TikTok URL
+  sourceChannel   String?     // Channel name for attribution
+
+  // Relations
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  projects        Project[]
+
+  @@map("styles")
+}
+
+// ============================================
+// Export Job (指摘#4対応 - 複数出力対応)
+// ============================================
+
+model ExportJob {
+  id              String      @id @default(cuid())
+  projectId       String
+  status          JobStatus   @default(PENDING)
+  progress        Int         @default(0)
+  progressMessage String?
+  quality         String      @default("720p") // 720p, 1080p, 4k
+  format          String      @default("mp4")  // mp4, webm, mov
+
+  // Multiple outputs (指摘#4対応)
+  videoUrl        String?     // 動画ファイル (API URL)
+  srtUrl          String?     // 字幕SRT (API URL)
+  thumbnailUrl    String?     // サムネイル画像 (API URL)
+
+  // Actual file paths on disk (for download)
+  videoPath       String?     // 動画ファイルパス
+  srtPath         String?     // SRTファイルパス
+  thumbnailPath   String?     // サムネイルパス
+
+  error           String?
+  createdAt       DateTime    @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  canceledAt      DateTime?
+
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("export_jobs")
+}
+
+enum JobStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELED
+}
+
+// ============================================
+// Analytics
+// ============================================
+
+model UsageLog {
+  id          String    @id @default(cuid())
+  userId      String
+  action      String    // upload, export, analyze, style_learn
+  resourceId  String?
+  duration    Int?      // Video duration in seconds (for quota tracking)
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("usage_logs")
+}
+
+// ============================================
+// AI Suggestions (for main editor)
+// ============================================
+
+model AISuggestion {
+  id          String            @id @default(cuid())
+  projectId   String
+  type        SuggestionType
+  title       String
+  description String
+  data        Json              // Suggestion-specific data
+  isApplied   Boolean           @default(false)
+  isDismissed Boolean           @default(false)
+  priority    Int               @default(0)
+  createdAt   DateTime          @default(now())
+
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("ai_suggestions")
+}
+
+enum SuggestionType {
+  SILENCE_CUT
+  TEMPO_OPTIMIZE
+  HIGHLIGHT_DETECT
+  SUBTITLE_IMPROVE
+  BGM_SUGGEST
+}

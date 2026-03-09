@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html class="light" lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>料金プラン - SakuEdit</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Noto+Sans+JP:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f97415",
+                        "primary-hover": "#d8600d",
+                        "background-light": "#ffffff",
+                        "background-dark": "#1a1a1a",
+                        "surface-light": "#fcfaf8",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "Noto Sans JP", "sans-serif"],
+                        "sans": ["Inter", "Noto Sans JP", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "0.75rem", "xl": "1rem", "2xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-background-light text-[#1c130d] antialiased">
+<header class="sticky top-0 z-50 w-full border-b border-[#f4ece6] bg-[#fcfaf8]/95 backdrop-blur-sm">
+<div class="mx-auto flex h-16 max-w-[960px] items-center justify-between px-4 sm:px-6 lg:px-8">
+<div class="flex items-center gap-4">
+<a class="flex items-center gap-2 text-[#1c130d] hover:opacity-80 transition-opacity" href="#">
+<div class="size-6 text-primary">
+<svg class="w-full h-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 42.4379C4 42.4379 14.0962 36.0744 24 41.1692C35.0664 46.8624 44 42.2078 44 42.2078L44 7.01134C44 7.01134 35.068 11.6577 24.0031 5.96913C14.0971 0.876274 4 7.27094 4 7.27094L4 42.4379Z" fill="currentColor"></path>
+</svg>
+</div>
+<span class="text-lg font-bold tracking-tight">SakuEdit</span>
+</a>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-sm font-medium text-[#1c130d] hover:text-primary transition-colors" href="#">機能</a>
+<a class="text-sm font-medium text-[#1c130d] hover:text-primary transition-colors" href="#">料金</a>
+<a class="text-sm font-medium text-[#1c130d] hover:text-primary transition-colors" href="#">ブログ</a>
+</nav>
+<div class="flex items-center gap-4">
+<a class="hidden sm:block text-sm font-medium text-[#1c130d] hover:text-primary transition-colors" href="#">ログイン</a>
+<button class="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover shadow-sm">
+                    無料で試す
+                </button>
+</div>
+</div>
+</header>
+<main class="flex flex-col items-center pb-20 pt-16 px-4">
+<div class="flex w-full max-w-[900px] flex-col items-center gap-8 mb-12 text-center">
+<h1 class="text-[32px] font-bold leading-tight text-[#1c130d] tracking-tight">料金プラン</h1>
+<div class="relative flex items-center justify-center p-1 rounded-full bg-[#f4ece6]">
+<div class="relative flex w-full">
+<label class="cursor-pointer group relative z-10 px-6 py-2">
+<input class="peer sr-only" name="billing" type="radio" value="monthly"/>
+<span class="relative z-10 text-sm font-medium text-[#6b7280] transition-colors peer-checked:text-[#1c130d]">月払い</span>
+<div class="absolute inset-0 rounded-full bg-white shadow-sm opacity-0 transition-all peer-checked:opacity-100 scale-90 peer-checked:scale-100"></div>
+</label>
+<label class="cursor-pointer group relative z-10 px-6 py-2">
+<input checked="" class="peer sr-only" name="billing" type="radio" value="yearly"/>
+<span class="relative z-10 text-sm font-medium text-[#6b7280] transition-colors peer-checked:text-[#1c130d] flex items-center gap-1">
+                            年払い 
+                            <span class="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full ml-1">-20%</span>
+</span>
+<div class="absolute inset-0 rounded-full bg-white shadow-sm opacity-0 transition-all peer-checked:opacity-100 scale-90 peer-checked:scale-100"></div>
+</label>
+</div>
+</div>
+</div>
+<div class="grid w-full max-w-[900px] grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8 items-stretch">
+<div class="relative flex flex-col rounded-xl border border-[#e5e7eb] bg-white p-8 shadow-sm transition-all hover:shadow-md h-full">
+<div class="mb-6">
+<h3 class="text-xl font-bold text-[#1c130d]">無料プラン</h3>
+<div class="mt-4 flex items-baseline gap-1">
+<span class="text-5xl font-extrabold text-[#1c130d]">¥0</span>
+<span class="text-sm font-medium text-gray-500">/月</span>
+</div>
+<p class="mt-2 text-sm text-gray-500">ずっと無料</p>
+</div>
+<div class="mb-8 w-full border-t border-[#f4ece6]"></div>
+<ul class="mb-8 flex flex-1 flex-col gap-4">
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>字幕自動生成 (月3本/5分まで)</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>字幕スタイル3種</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>無音カット提案</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>720p書き出し</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>ウォーターマーク付き</span>
+</li>
+</ul>
+<button class="mt-auto w-full rounded-lg border border-[#e5e7eb] bg-white px-4 py-3 text-sm font-bold text-[#1c130d] transition-colors hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200">
+                    無料で始める
+                </button>
+</div>
+<div class="relative flex flex-col rounded-xl border border-t-4 border-[#e5e7eb] border-t-primary bg-white p-8 shadow-lg shadow-orange-100 transition-all hover:shadow-xl hover:shadow-orange-200/50 h-full">
+<div class="absolute right-4 top-4 rounded-full bg-primary/10 px-3 py-1">
+<span class="text-xs font-bold text-primary">おすすめ</span>
+</div>
+<div class="mb-6">
+<h3 class="text-xl font-bold text-[#1c130d]">PROプラン</h3>
+<div class="mt-4 flex items-baseline gap-1">
+<span class="text-5xl font-extrabold text-[#1c130d]">¥1,000</span>
+<span class="text-sm font-medium text-gray-500">/月</span>
+</div>
+<p class="mt-2 text-sm text-primary font-medium">¥10,000/年 (2ヶ月分お得)</p>
+</div>
+<div class="mb-8 w-full border-t border-[#f4ece6]"></div>
+<ul class="mb-8 flex flex-1 flex-col gap-4">
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>字幕無制限 (30分まで)</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>全スタイル + カスタム</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>無音カット自動適用</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>1080p書き出し</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>ウォーターマークなし</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>サムネ自動生成</span>
+</li>
+<li class="flex items-start gap-3 text-[14px] text-[#1c130d]">
+<span class="material-symbols-outlined text-[20px] text-green-600 shrink-0">check</span>
+<span>参考スタイル適用</span>
+</li>
+</ul>
+<button class="mt-auto w-full rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-primary-hover hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                    PROを始める
+                </button>
+</div>
+</div>
+<div class="mt-12 flex w-full max-w-[900px] flex-col items-center gap-6">
+<div class="flex items-center gap-2 opacity-60 grayscale transition-all hover:opacity-100 hover:grayscale-0">
+<div class="flex gap-4 items-center">
+<div class="h-6 w-10 rounded bg-[#1a1f71]" data-alt="Visa card logo placeholder" title="Visa"></div>
+<div class="h-6 w-10 rounded bg-[#eb001b]" data-alt="Mastercard logo placeholder" title="Mastercard"></div>
+<div class="h-6 w-10 rounded bg-black" data-alt="Apple Pay logo placeholder" title="Apple Pay"></div>
+<div class="h-6 w-10 rounded bg-white border border-gray-300" data-alt="Google Pay logo placeholder" title="Google Pay"></div>
+</div>
+<span class="ml-2 text-xs font-medium text-gray-400">安全な決済 by Stripe</span>
+</div>
+<a class="group flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-primary" href="#">
+                よくある質問
+                <span class="material-symbols-outlined text-[16px] transition-transform group-hover:translate-x-0.5">arrow_forward</span>
+</a>
+</div>
+</main>
+</body></html>

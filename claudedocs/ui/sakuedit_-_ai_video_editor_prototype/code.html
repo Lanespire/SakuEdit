@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ja" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SakuEdit - AI Video Editor Prototype</title>
+    <!-- Tailwind CSS with plugins -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+JP:wght@300;400;500;700;900&family=Be+Vietnam+Pro:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f97415",
+                        "primary-hover": "#d8600d",
+                        "primary-light": "#ff9f5e",
+                        "background-light": "#fcfaf8",
+                        "background-dark": "#23170f",
+                        "surface": "#ffffff",
+                        "panel-dark": "#2c1e16",
+                        "panel-lighter": "#3a2a20",
+                        "text-main": "#1c130d",
+                        "text-sub": "#9e6b47",
+                        "border-main": "#f0e6df",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#2d241f",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "Noto Sans JP", "sans-serif"],
+                        "body": ["Inter", "Noto Sans JP", "sans-serif"],
+                        "sans": ["Inter", "Noto Sans JP", "sans-serif"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "2xl": "2rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', 'Noto Sans JP', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .text-stroke-black {
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+        }
+        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+        .timeline-scroll::-webkit-scrollbar { height: 8px; }
+        .timeline-scroll::-webkit-scrollbar-track { background: #23170f; }
+        .timeline-scroll::-webkit-scrollbar-thumb { background: #4a3221; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-main dark:text-white transition-colors duration-200">
+    <div id="root"></div>
+
+    <!-- React and Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // --- Common Components ---
+
+        const Navbar = ({ activeTab = "edit" }) => {
+            const navigate = useNavigate();
+            return (
+                <header class="fixed top-0 left-0 right-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-[#f4ece6] dark:border-[#3a2e26] h-16">
+                    <div class="max-w-[1200px] mx-auto px-4 h-full flex items-center justify-between">
+                        <div class="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+                            <span class="text-2xl">🎬</span>
+                            <span class="font-bold text-lg tracking-tight">SakuEdit</span>
+                        </div>
+                        <nav class="hidden md:flex items-center gap-1 bg-white dark:bg-[#2f2016] p-1 rounded-full border border-[#f4ece6] dark:border-[#3a2e26]">
+                            <Link to="/" class={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'edit' ? 'bg-[#1c130d] dark:bg-white text-white dark:text-[#1c130d] font-bold shadow-sm' : 'text-[#6b584b] dark:text-[#9e8b7d] hover:bg-[#f4ece6] dark:hover:bg-[#3a2e26]'}`}>編集</Link>
+                            <Link to="/styles" class={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'styles' ? 'bg-[#1c130d] dark:bg-white text-white dark:text-[#1c130d] font-bold shadow-sm' : 'text-[#6b584b] dark:text-[#9e8b7d] hover:bg-[#f4ece6] dark:hover:bg-[#3a2e26]'}`}>スタイル学習</Link>
+                            <Link to="/projects" class={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'history' ? 'bg-[#1c130d] dark:bg-white text-white dark:text-[#1c130d] font-bold shadow-sm' : 'text-[#6b584b] dark:text-[#9e8b7d] hover:bg-[#f4ece6] dark:hover:bg-[#3a2e26]'}`}>履歴</Link>
+                        </nav>
+                        <div class="flex items-center gap-4">
+                            <Link to="/pricing" class="bg-primary hover:bg-[#e0650f] text-white text-sm font-bold h-9 px-4 rounded-lg shadow-sm shadow-primary/20 transition-all flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[18px]">diamond</span> PRO
+                            </Link>
+                            <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-primary-light flex items-center justify-center text-white font-bold text-sm shadow-sm ring-2 ring-white dark:ring-[#23170f] cursor-pointer">MK</div>
+                        </div>
+                    </div>
+                </header>
+            );
+        };
+
+        // --- Screen Components ---
+
+        const HomePage = () => {
+            const navigate = useNavigate();
+            return (
+                <div class="min-h-screen flex flex-col">
+                    <Navbar activeTab="edit" />
+                    <main class="flex-grow pt-28 pb-20 px-4 md:px-6 w-full max-w-[848px] mx-auto flex flex-col gap-10">
+                        <div class="text-center space-y-4">
+                            <h1 class="text-3xl md:text-4xl font-black tracking-tight leading-tight text-[#1c130d] dark:text-white">この人みたいな動画、作れます</h1>
+                            <p class="text-[#9e6b47] dark:text-[#bca08d] text-base md:text-lg font-medium max-w-xl mx-auto leading-relaxed">参考動画のスタイルをAIが学習。字幕・カット・テンポを自動で再現します。</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-surface dark:bg-[#2a1d15] border border-[#e9d9ce] dark:border-[#3a2e26] rounded-xl p-6 flex flex-col gap-5 shadow-sm">
+                                <div class="flex items-center gap-2 border-b border-[#f4ece6] dark:border-[#3a2e26] pb-3">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                                    <h2 class="font-bold text-lg">編集する動画</h2>
+                                </div>
+                                <div onClick={() => navigate('/editor')} class="group relative flex flex-col items-center justify-center gap-3 h-48 rounded-xl border-2 border-dashed border-[#e9d9ce] dark:border-[#4a3a30] bg-[#fcfaf8] dark:bg-[#23170f] hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all cursor-pointer">
+                                    <div class="p-3 bg-white dark:bg-[#2a1d15] rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                        <span class="material-symbols-outlined text-blue-500 text-3xl">cloud_upload</span>
+                                    </div>
+                                    <div class="text-center space-y-1">
+                                        <p class="font-bold text-[#1c130d] dark:text-white text-sm">ドロップまたはクリック</p>
+                                        <p class="text-xs text-[#9e6b47]">MP4, MOV, WebM (最大500MB)</p>
+                                    </div>
+                                </div>
+                                <div class="relative flex py-1 items-center">
+                                    <div class="flex-grow border-t border-[#f4ece6] dark:border-[#3a2e26]"></div>
+                                    <span class="flex-shrink-0 mx-4 text-xs font-bold text-[#9e6b47]">OR</span>
+                                    <div class="flex-grow border-t border-[#f4ece6] dark:border-[#3a2e26]"></div>
+                                </div>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#9e6b47] text-[20px]">link</span>
+                                    <input class="w-full pl-10 pr-4 py-3 bg-[#fcfaf8] dark:bg-[#1c130d] border border-[#e9d9ce] dark:border-[#4a3a30] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow placeholder:text-[#9e6b47]/60" placeholder="YouTube/TikTok URLを貼り付け" type="text"/>
+                                </div>
+                            </div>
+                            <div class="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl p-6 flex flex-col gap-5 relative overflow-hidden">
+                                <div class="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-2xl"></div>
+                                <div class="flex items-center justify-between border-b border-primary/10 pb-3 z-10">
+                                    <div class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-primary">auto_fix_high</span>
+                                        <h2 class="font-bold text-lg text-[#1c130d] dark:text-white">参考にしたい動画</h2>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-black tracking-wider bg-primary text-white">PRO</span>
+                                </div>
+                                <p class="text-xs text-[#9e6b47] dark:text-[#bca08d] -mt-3 font-medium">このスタイルを真似します</p>
+                                <div onClick={() => navigate('/styles')} class="group relative flex flex-col items-center justify-center gap-3 h-48 rounded-xl border-2 border-dashed border-primary/30 bg-white/50 dark:bg-black/20 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer z-10">
+                                    <div class="p-3 bg-white dark:bg-[#2a1d15] rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                        <span class="material-symbols-outlined text-primary text-3xl">stars</span>
+                                    </div>
+                                    <div class="text-center space-y-1">
+                                        <p class="font-bold text-[#1c130d] dark:text-white text-sm">参考動画をアップロード</p>
+                                        <p class="text-xs text-[#9e6b47]">MP4, MOV (スタイルのみ学習)</p>
+                                    </div>
+                                </div>
+                                <div class="relative z-10">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#9e6b47] text-[20px]">link</span>
+                                    <input class="w-full pl-10 pr-4 py-3 bg-white dark:bg-[#1c130d] border border-primary/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-shadow placeholder:text-[#9e6b47]/60" placeholder="参考にしたいYouTube URLを貼り付け" type="text"/>
+                                </div>
+                                <div class="flex flex-wrap gap-2 z-10">
+                                    <span class="text-[10px] font-bold text-[#9e6b47] py-1">例:</span>
+                                    <button class="px-2.5 py-1 rounded-full bg-white dark:bg-[#1c130d] border border-[#e9d9ce] dark:border-[#4a3a30] text-[10px] font-medium text-[#6b584b] hover:border-primary hover:text-primary transition-colors">HIKAKIN</button>
+                                    <button class="px-2.5 py-1 rounded-full bg-white dark:bg-[#1c130d] border border-[#e9d9ce] dark:border-[#4a3a30] text-[10px] font-medium text-[#6b584b] hover:border-primary hover:text-primary transition-colors">東海オンエア</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button onClick={() => navigate('/processing')} class="w-full h-14 rounded-full bg-gradient-to-r from-[#f97415] to-[#ff9f5e] hover:from-[#e0650f] hover:to-[#f97415] text-white text-lg font-black tracking-wide shadow-lg shadow-primary/30 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 group">
+                            AIで編集をはじめる <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </button>
+                    </main>
+                </div>
+            );
+        };
+
+        const ProjectsPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div class="min-h-screen flex flex-col">
+                    <Navbar activeTab="history" />
+                    <main class="flex-grow pt-24 pb-20 px-4 md:px-6 w-full max-w-[1200px] mx-auto">
+                        <div class="flex flex-col md:flex-row gap-8">
+                            <aside class="w-full md:w-64 flex-shrink-0 space-y-8">
+                                <div class="space-y-1">
+                                    <h1 class="text-xl font-black text-[#1c130d] dark:text-white px-3 mb-4">マイプロジェクト</h1>
+                                    <nav class="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible hide-scrollbar pb-2 md:pb-0">
+                                        <button class="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary/10 text-primary font-bold text-sm w-full text-left">
+                                            <span class="material-symbols-outlined text-[20px]">grid_view</span> 全て
+                                        </button>
+                                        <button class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[#6b584b] dark:text-[#9e8b7d] hover:bg-[#f4ece6] dark:hover:bg-[#3a2e26] font-medium text-sm w-full text-left transition-colors">
+                                            <span class="material-symbols-outlined text-[20px]">edit_note</span> 下書き
+                                        </button>
+                                    </nav>
+                                </div>
+                            </aside>
+                            <div class="flex-grow space-y-6">
+                                <button onClick={() => navigate('/')} class="w-full h-16 rounded-xl bg-white dark:bg-[#2a1d15] border-2 border-dashed border-[#e9d9ce] dark:border-[#3a2e26] hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 transition-all flex items-center justify-center gap-3 group">
+                                    <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
+                                        <span class="material-symbols-outlined text-[20px]">add</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-[#1c130d] dark:text-white group-hover:text-primary transition-colors">新規プロジェクトを作成</span>
+                                </button>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {[
+                                        { title: 'vlog_tokyo_trip', status: '完了', date: '2023.10.25', duration: '02:45' },
+                                        { title: 'product_review_sony', status: '下書き', date: '2023.10.23', duration: '-' },
+                                        { title: 'game_stream_highlight', status: '完了', date: '2023.10.20', duration: '12:30' }
+                                    ].map((p, i) => (
+                                        <article key={i} class="group bg-white dark:bg-[#2a1d15] rounded-xl border border-[#e9d9ce] dark:border-[#3a2e26] overflow-hidden hover:shadow-md transition-shadow">
+                                            <div class="relative aspect-video bg-gray-100 dark:bg-[#1c130d] overflow-hidden">
+                                                <div class="absolute inset-0 bg-gradient-to-br from-orange-100 to-amber-50 dark:from-gray-800 dark:to-gray-900 group-hover:scale-105 transition-transform duration-500"></div>
+                                                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                                                    <span class="material-symbols-outlined text-white text-4xl drop-shadow-md">play_circle</span>
+                                                </div>
+                                                <div class={`absolute top-2 left-2 px-2 py-1 text-white text-[10px] font-bold rounded backdrop-blur-sm shadow-sm ${p.status === '完了' ? 'bg-green-500/90' : 'bg-gray-500/90'}`}>
+                                                    {p.status}
+                                                </div>
+                                                {p.duration !== '-' && (
+                                                    <div class="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded backdrop-blur-sm">{p.duration}</div>
+                                                )}
+                                            </div>
+                                            <div class="p-4 space-y-3">
+                                                <h3 class="font-bold text-[#1c130d] dark:text-white truncate group-hover:text-primary transition-colors">{p.title}</h3>
+                                                <div class="flex items-center gap-2 text-[11px] text-[#9e6b47]">
+                                                    <span class="material-symbols-outlined text-[14px]">calendar_today</span> {p.date}
+                                                </div>
+                                                <div class="pt-2 border-t border-[#f4ece6] dark:border-[#3a2e26] flex justify-end">
+                                                    <button onClick={() => navigate('/editor')} class="text-xs font-bold bg-[#1c130d] dark:bg-white text-white dark:text-[#1c130d] px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white transition-colors">
+                                                        {p.status === '完了' ? '編集' : '再開'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const StylesPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div class="min-h-screen bg-background-light dark:bg-background-dark flex flex-col">
+                    <header class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-main px-6 py-4">
+                        <div class="max-w-7xl mx-auto flex items-center justify-between gap-6">
+                            <div class="flex items-center gap-4">
+                                <button onClick={() => navigate('/')} class="p-2 hover:bg-orange-50 rounded-full transition-colors text-text-main group">
+                                    <span class="material-symbols-outlined group-hover:text-primary transition-colors">arrow_back</span>
+                                </button>
+                                <h1 class="text-2xl font-bold tracking-tight text-text-main dark:text-white">編集スタイルを選ぶ</h1>
+                            </div>
+                        </div>
+                    </header>
+                    <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
+                        <nav class="flex space-x-8 border-b border-border-main mb-8 overflow-x-auto scrollbar-hide">
+                            <a class="pb-4 px-2 border-b-[3px] border-primary text-primary font-bold text-sm tracking-wide" href="#">プリセット</a>
+                            <a class="pb-4 px-2 border-b-[3px] border-transparent text-text-sub hover:text-primary font-medium text-sm transition-all" href="#">人気クリエイター</a>
+                        </nav>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[
+                                { title: 'YouTuber定番', cat: 'エンタメ', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCNKMKWEeUIiJrCDsrfYV8p4_UxLmcByE6EHA77NXDYE-PTZFsMXHrdaqMhZduPuS08z-54e4HtLpddWmc7dgXTSNMHMz7TzrKjwEIxmZj5-BkYukOfT9Cqxe7MGfH_aJMlGKTPJAbZx1u26Ocs7BLTOcRPDtZcWBTgp24pOtYjYeU7cG0shdcyvJTyKu4FXVxfGuDTQ3Yj82NOsfSLIDS9GkUBb-Z7tmexN2P25fuqDukzX5E41QEElIpq5jYsHn5O449FKVzJoSGo' },
+                                { title: 'ビジネス・セミナー', cat: '解説', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB9KYL_K-2_0j6NAKn-IU6cjzSakHxl9YhGiwoYOEpA9b4lvtmb8WElCfpr689Bc3eKAfAhogn2Q_hwDZyt-ZViYkYoZPoAfFTXE_U2LVW2ML8QyuDD3twMm6Lh0cCclTgwFR6WigeETeUCkxr_TswZf7MntKymfNe7BomHhhWdSSZB84L91s6f96hGFNTW_4C7rMMnFZ56EkDeQNRWU7vQqXxWbc8c1E2NAR_0JX4q4YO-GncqJUs_kV1bq7AZi-7NYiPVECKkrQJ3' },
+                                { title: 'Shorts最適化', cat: '9:16', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCN6jrUtb29pVTAQiSGMUkXHgCr97pPNrAtRUBEZSGAMyjsXjVYOi5kttgbZ055wCXy4owMBNXk43K_aZTaFHCbmVYWGnEJqrih5R6my15lN5-LFshtBGUtCQg7vQn6e70ZaabD0SOyI7xzYRUJdOqhLjW9xbm5V0O-iejLtOGMdHt54V8rRdIAcq-Rl0NY9y3zcrj-rbP6nKEgG3_IWFXNsomGkCKCJo9EmhM7nByZ1ka5BV-F7P9r3-45d8cMw-ZIcTTVWPlkCjUN' }
+                            ].map((s, i) => (
+                                <div key={i} class="group bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-border-main hover:shadow-xl transition-all flex flex-col">
+                                    <div class="relative aspect-video overflow-hidden">
+                                        <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" style={{backgroundImage: `url('${s.img}')`}}></div>
+                                    </div>
+                                    <div class="p-5 flex-grow flex flex-col">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <h3 class="text-lg font-bold text-text-main dark:text-white group-hover:text-primary transition-colors">{s.title}</h3>
+                                            <span class="bg-orange-50 dark:bg-orange-900/30 text-orange-600 border border-orange-100 dark:border-orange-800 text-xs px-2 py-1 rounded-md font-medium">{s.cat}</span>
+                                        </div>
+                                        <div class="mt-auto flex justify-between items-center">
+                                            <span class="text-xs text-text-sub">12,345人が使用</span>
+                                            <button onClick={() => navigate('/style-learning')} class="bg-primary hover:bg-orange-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors">適用する</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const ProcessingPage = () => {
+            const navigate = useNavigate();
+            const [progress, setProgress] = useState(0);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setProgress(prev => {
+                        if (prev >= 100) {
+                            clearInterval(interval);
+                            setTimeout(() => navigate('/editor'), 1000);
+                            return 100;
+                        }
+                        return prev + 1;
+                    });
+                }, 50);
+                return () => clearInterval(interval);
+            }, [navigate]);
+
+            return (
+                <div class="h-screen flex flex-col bg-background-light dark:bg-background-dark overflow-hidden">
+                    <header class="flex-none flex items-center justify-between border-b border-[#f4ece6] px-6 py-3 bg-white dark:bg-slate-900">
+                        <div class="flex items-center gap-3">
+                            <div class="size-8 flex items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <span class="material-symbols-outlined text-2xl">auto_videocam</span>
+                            </div>
+                            <h2 class="text-lg font-bold">パッと編集</h2>
+                        </div>
+                        <button onClick={() => navigate('/')} class="h-9 px-4 bg-gray-100 dark:bg-slate-800 rounded-xl text-sm font-bold">キャンセル</button>
+                    </header>
+                    <main class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+                        <section class="flex-[5.5] bg-black/5 dark:bg-black/20 flex flex-col p-6 justify-center items-center">
+                            <div class="relative w-full max-w-4xl aspect-video bg-black rounded-xl shadow-lg overflow-hidden">
+                                <div class="absolute inset-0 bg-cover bg-center opacity-80" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBXhorvO_nRk8GPdZAu7745UUts1BK0dnXBtltZlC9C9_IDCTpR5ovV7KdC9W5l6vkpn98e_8w4UMJ-dtnpkpJBjmmr5lCO7lsz9_VkAI2I0Bs4G1JIjtKgrdVNXpUWa4M95AaFqYpsKhakg7D330XxfO__jNUshTm4-3zZwnKqqoEj5BkjHQ5Ue8hiY6rLJb1JXtXYNHV8XuD_cqQHwvUpgTHGMXB61e9uANxrlNSEnmgaLpMZR5UrCdq_jQV0z3DU0C7PqLI5tLKo')"}}></div>
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                                <div class="absolute bottom-16 left-0 right-0 text-center px-8">
+                                    <span class="inline-block bg-white/90 dark:bg-slate-900/90 text-black dark:text-white px-4 py-2 text-xl font-bold rounded-lg shadow-sm">今日はプログラミングについて...</span>
+                                </div>
+                                <div class="absolute bottom-0 inset-x-0 p-4">
+                                    <div class="w-full h-1.5 bg-white/30 rounded-full">
+                                        <div class="h-full bg-primary rounded-full transition-all duration-300" style={{width: `${progress}%`}}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="flex-[4.5] bg-white dark:bg-[#1a110a] border-l border-[#f4ece6] dark:border-white/5 flex flex-col h-full overflow-hidden">
+                            <div class="p-6 border-b border-[#f4ece6] dark:border-white/5">
+                                <div class="flex items-start justify-between mb-6">
+                                    <div>
+                                        <h1 class="text-4xl font-bold text-primary">{progress}%</h1>
+                                        <p class="text-lg font-bold">スタイルを適用中...</p>
+                                    </div>
+                                    <div class="size-16 relative">
+                                        <svg class="size-full -rotate-90" viewbox="0 0 36 36">
+                                            <path class="text-gray-100 dark:text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3"></path>
+                                            <path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray={`${progress}, 100`} stroke-linecap="round" stroke-width="3"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                                <div class="flex items-center gap-3">
+                                    <div class={`size-7 rounded-full flex items-center justify-center shrink-0 border-2 border-white ${progress > 30 ? 'bg-green-100 text-green-600' : 'bg-primary text-white'}`}>
+                                        <span class="material-symbols-outlined text-sm">{progress > 30 ? 'check' : 'sync'}</span>
+                                    </div>
+                                    <p class="text-sm font-medium">動画を読み込み</p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class={`size-7 rounded-full flex items-center justify-center shrink-0 border-2 border-white ${progress > 70 ? 'bg-green-100 text-green-600' : (progress > 30 ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400')}`}>
+                                        <span class="material-symbols-outlined text-sm">{progress > 70 ? 'check' : 'sync'}</span>
+                                    </div>
+                                    <p class="text-sm font-medium">音声をテキスト化</p>
+                                </div>
+                                <div class="bg-gray-900 rounded-lg p-4 font-mono text-xs text-gray-300 h-48 overflow-y-auto">
+                                    <p class="text-green-400">[00:01] 処理開始...</p>
+                                    <p>[00:15] 字幕生成中: 「こんにちは！」</p>
+                                    {progress > 50 && <p>[00:25] スタイル適用: 縁取り, フォント設定</p>}
+                                    {progress > 80 && <p class="text-primary">[00:45] 最終レンダリング中...</p>}
+                                </div>
+                            </div>
+                        </section>
+                    </main>
+                </div>
+            );
+        };
+
+        const StyleLearningPage = () => {
+            const navigate = useNavigate();
+            const [done, setDone] = useState(false);
+
+            useEffect(() => {
+                const timer = setTimeout(() => setDone(true), 3000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            return (
+                <div class="min-h-screen bg-background-light dark:bg-background-dark flex flex-col">
+                    <header class="flex items-center justify-between border-b dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onClick={() => navigate('/styles')} class="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"><span class="material-symbols-outlined text-2xl">arrow_back</span></button>
+                            <h2 class="text-lg font-bold">スタイルを学習中...</h2>
+                        </div>
+                        <button onClick={() => navigate('/')} class="size-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800"><span class="material-symbols-outlined">close</span></button>
+                    </header>
+                    <main class="flex-1 max-w-[1200px] mx-auto w-full p-8 flex flex-col gap-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <div class="lg:col-span-5">
+                                <div class="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border dark:border-slate-700">
+                                    <div class="relative aspect-video rounded-lg overflow-hidden group mb-4">
+                                        <div class="w-full h-full bg-cover bg-center" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDAGcav80fzRFXHM0DhKbiOlOKff27nC1g2_mAJIqMdx_shM5quJ6smpXa0Hx51cXR8OO26PkW92s4GXMZJALVQK8z2Knj9Za_w4hKLdy0aHgUC_Do1qyyPdKamh5FCF1vE0UMaJck4ov57TwH1bx3jxFbfECGUgoXVQliK7uLcB6VnxcvAWDF4hTHSpQmBLnRbGxZ-Uu_unIxAzPJMnrubqrEL44lVQPKFXgMGI3NnoexB3L93-KVkRrF2h6LQopMjx8NdRAvzxJEV')"}}></div>
+                                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="material-symbols-outlined text-white text-6xl">play_circle</span></div>
+                                    </div>
+                                    <h3 class="font-bold">【神回】〇〇やってみた！驚きの結末に...</h3>
+                                    <p class="text-sm text-slate-500">Taka Channel</p>
+                                </div>
+                            </div>
+                            <div class="lg:col-span-7 space-y-6">
+                                <div class="flex items-center gap-3">
+                                    {!done ? (
+                                        <div class="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+                                    ) : (
+                                        <div class="size-8 rounded-full bg-green-500 text-white flex items-center justify-center"><span class="material-symbols-outlined">check</span></div>
+                                    )}
+                                    <h2 class="text-2xl font-bold">{done ? '学習が完了しました！' : 'AIがスタイルを学習中...'}</h2>
+                                </div>
+                                <div class="space-y-3">
+                                    {[
+                                        { title: '字幕スタイルを検出', desc: '白文字 + 黒縁取り, バウンスアニメーション', ready: true },
+                                        { title: 'カットのテンポを分析', desc: '平均シーン長: 3.2秒, ジャンプカット多用', ready: true },
+                                        { title: 'BGM/SE傾向を分析', desc: 'アップテンポ, 場面転換でSE', ready: done }
+                                    ].map((s, i) => (
+                                        <div key={i} class={`flex gap-4 p-4 rounded-xl shadow-sm border transition-all ${s.ready ? 'bg-white dark:bg-slate-900 border-slate-100' : 'bg-slate-50 opacity-40'}`}>
+                                            <div class={`flex items-center justify-center rounded-full shrink-0 w-10 h-10 ${s.ready ? 'bg-orange-100 text-primary' : 'bg-slate-200'}`}>
+                                                <span class="material-symbols-outlined">{s.ready ? 'check' : 'sync'}</span>
+                                            </div>
+                                            <div>
+                                                <p class="font-bold">{s.title}</p>
+                                                <p class="text-xs text-slate-500">{s.desc}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {done && (
+                                    <button onClick={() => navigate('/editor')} class="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-[1.02]">このスタイルで編集をはじめる</button>
+                                )}
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const EditorPage = () => {
+            const navigate = useNavigate();
+            const [showExport, setShowExport] = useState(false);
+            const [showSubtitleEdit, setShowSubtitleEdit] = useState(false);
+
+            return (
+                <div class="bg-background-dark text-white font-display overflow-hidden flex flex-col h-screen relative">
+                    <header class="flex shrink-0 items-center justify-between border-b border-[#4a3221] px-6 py-3 bg-[#231810] z-20">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-3">
+                                <div onClick={() => navigate('/')} class="size-8 bg-primary rounded-lg flex items-center justify-center cursor-pointer shadow-lg shadow-primary/20">
+                                    <span class="material-symbols-outlined text-white">movie_edit</span>
+                                </div>
+                                <div><h2 class="text-lg font-bold leading-tight">SakuEdit</h2></div>
+                            </div>
+                            <div class="h-6 w-[1px] bg-white/10 mx-2"></div>
+                            <p class="text-sm text-white/90 font-medium">vlog_tokyo_trip_01.mp4</p>
+                        </div>
+                        <div class="flex items-center gap-5">
+                            <button onClick={() => navigate('/projects')} class="flex items-center gap-2 text-sm text-white/60 hover:text-white"><span class="material-symbols-outlined">folder_open</span> マイプロジェクト</button>
+                            <div class="w-9 h-9 rounded-full bg-cover bg-center ring-2 ring-white/10" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBYEjE-44c3yZ6B9dtkZka_oK0wRo64oA3qbCjD_vfCcWfb-1OCbh8MRMxIEorl8XudPmPdRdejLR13pe3oTarKzZl8D9QkMDQ5G8l0vdiZEIU534LADnrnMUa1Jlm95PfElKULvc_P_CfiRoPJ6A_kjqgJamB3fLj5XSd9dE7aGC-vGzs_MCGmsVVzzo73Wfy6SKWm-0dCamR5B6XkV9FJ1SHF9-rQ3cXXZs7DUkboOx680QzfoiGoyyubCiZELH7feO2NGcKOnSbT')"}}></div>
+                        </div>
+                    </header>
+                    <main class="flex-1 flex flex-col overflow-hidden relative">
+                        <div class="flex-shrink-0 bg-[#1a110a] py-6 px-4 flex justify-center border-b border-[#4a3221]">
+                            <div class="relative w-full max-w-[800px] aspect-video bg-black rounded-xl overflow-hidden shadow-2xl group">
+                                <div class="absolute inset-0 bg-cover bg-center opacity-80" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDjGvxu495JEZ63VXBOqZq05RGCYqBYlcAGgi_yikyrVunGG0logcN478IX_srVmV2ODfl3gMlsRvoPUq2Mof8AZC08_7Ge3-xj6v8iUWE_VK4c3DcCD3T0NMu1XQhsEOV699mDXKGp5NntevdBtxgI2IypDWwGC1AVumUa4n0os4mcu-HNeLH0dMYKezjz5clY6cKhrs3nRMfDN8JixKV4GGXmzgnjxt_ePfjOCGL0Xj7_8-qfMUSvS_-A9u0UDVhtjuEGijTSStmQ')"}}></div>
+                                <div class="absolute top-4 right-4 z-10">
+                                    <div class="flex h-8 items-center gap-x-2 rounded-full bg-primary/90 backdrop-blur-sm pl-3 pr-4 shadow-lg border border-white/10">
+                                        <span class="material-symbols-outlined text-white text-[18px]">auto_awesome</span>
+                                        <p class="text-white text-xs font-bold">YouTuber風スタイル</p>
+                                    </div>
+                                </div>
+                                <div class="absolute inset-0 flex items-center justify-center group-hover:bg-black/20 transition-all">
+                                    <button class="size-16 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-primary transition-all"><span class="material-symbols-outlined text-4xl ml-1">play_arrow</span></button>
+                                </div>
+                                <div class="absolute bottom-12 left-0 right-0 text-center"><span class="text-xl font-bold bg-white/90 text-black px-4 py-1 rounded shadow-lg">マジで最高でした！</span></div>
+                            </div>
+                        </div>
+                        <div class="flex-1 flex flex-col bg-panel-dark overflow-hidden">
+                            <div class="flex items-center justify-between px-4 py-2 bg-[#231810] border-b border-[#4a3221]">
+                                <h3 class="text-sm font-bold flex items-center gap-2"><span class="material-symbols-outlined text-primary text-lg">view_timeline</span> タイムライン</h3>
+                                <div class="flex gap-2">
+                                    <button class="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded border border-white/5">全体表示</button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-x-auto timeline-scroll bg-panel-dark p-4 space-y-2">
+                                <div class="flex items-center gap-4 h-12">
+                                    <div class="w-16 text-[10px] text-white/40">VIDEO</div>
+                                    <div class="flex-1 flex gap-1">
+                                        <div class="h-10 w-48 bg-blue-600/30 border border-blue-500/50 rounded flex items-center px-2 text-[10px]">CLIP_01.mp4</div>
+                                        <div class="h-10 w-64 bg-blue-600/30 border border-blue-500/50 rounded flex items-center px-2 text-[10px]">CLIP_02.mp4</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-4 h-10">
+                                    <div class="w-16 text-[10px] text-white/40">SUBTITLE</div>
+                                    <div class="flex-1 flex gap-4">
+                                        <div onClick={() => setShowSubtitleEdit(true)} class="h-8 w-32 bg-purple-500/20 border border-purple-500/50 rounded flex items-center px-2 text-[10px] cursor-pointer hover:bg-purple-500/40">こんにちは！</div>
+                                        <div onClick={() => setShowSubtitleEdit(true)} class="h-8 w-40 bg-primary/20 border border-primary/50 rounded flex items-center px-2 text-[10px] cursor-pointer hover:bg-primary/40 shadow-[0_0_10px_rgba(249,116,21,0.2)]">マジで最高でした！</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[700px] px-4">
+                        <div class="bg-[#2c1e16]/90 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl p-2 flex items-center justify-between">
+                            <div class="flex items-center gap-1 pl-2">
+                                <button class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><span class="material-symbols-outlined">undo</span></button>
+                                <button class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><span class="material-symbols-outlined">redo</span></button>
+                                <div class="w-[1px] h-6 bg-white/10 mx-1"></div>
+                                <span class="text-[10px] text-white/40">自動保存済</span>
+                            </div>
+                            <button onClick={() => setShowExport(true)} class="px-6 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-bold rounded-lg shadow-lg transition-all flex items-center gap-2">書き出し <span class="material-symbols-outlined text-[18px]">expand_more</span></button>
+                        </div>
+                    </div>
+
+                    {/* Modals */}
+                    {showExport && (
+                        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                            <div class="w-full max-w-[480px] bg-surface-light dark:bg-surface-dark rounded-xl shadow-2xl flex flex-col overflow-hidden text-text-main dark:text-white">
+                                <div class="flex items-center justify-between px-6 py-4 border-b dark:border-white/5">
+                                    <h2 class="text-xl font-bold flex items-center gap-2">📤 書き出し設定</h2>
+                                    <button onClick={() => setShowExport(false)} class="text-text-sub hover:text-text-main"><span class="material-symbols-outlined">close</span></button>
+                                </div>
+                                <div class="p-6 space-y-6 overflow-y-auto">
+                                    <div class="space-y-3">
+                                        <h3 class="text-sm font-bold">解像度</h3>
+                                        <div class="flex flex-col gap-2">
+                                            {['720p HD', '1080p Full HD', '4K Ultra HD'].map((r, i) => (
+                                                <label key={i} class={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${i === 1 ? 'bg-primary/5 border-primary' : 'dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
+                                                    <input type="radio" name="res" class="sr-only" defaultChecked={i===1} />
+                                                    <div class="flex-1 flex items-center gap-2">
+                                                        <span class="font-bold">{r}</span>
+                                                        {i === 1 && <span class="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded font-black">PRO</span>}
+                                                    </div>
+                                                    <div class={`w-5 h-5 rounded-full border-2 ${i === 1 ? 'border-primary bg-primary' : 'border-gray-300 dark:border-slate-600'}`}></div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => {setShowExport(false); navigate('/projects');}} class="w-full py-3 bg-primary text-white font-bold rounded-lg shadow-lg hover:bg-primary-hover transition-colors">書き出しを開始</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showSubtitleEdit && (
+                        <div class="fixed inset-0 z-[60] flex items-end justify-center">
+                            <div class="w-full max-w-[1200px] bg-white dark:bg-[#1a1614] rounded-t-2xl shadow-2xl flex flex-col h-[85vh] border-t border-white/10 text-text-main dark:text-white">
+                                <div class="w-full flex justify-center py-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors" onClick={() => setShowSubtitleEdit(false)}>
+                                    <div class="w-16 h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full"></div>
+                                </div>
+                                <div class="px-8 flex-1 grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
+                                    <div class="space-y-4">
+                                        <div class="aspect-video bg-black rounded-lg overflow-hidden relative">
+                                            <div class="absolute inset-0 bg-cover bg-center opacity-70" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDjGvxu495JEZ63VXBOqZq05RGCYqBYlcAGgi_yikyrVunGG0logcN478IX_srVmV2ODfl3gMlsRvoPUq2Mof8AZC08_7Ge3-xj6v8iUWE_VK4c3DcCD3T0NMu1XQhsEOV699mDXKGp5NntevdBtxgI2IypDWwGC1AVumUa4n0os4mcu-HNeLH0dMYKezjz5clY6cKhrs3nRMfDN8JixKV4GGXmzgnjxt_ePfjOCGL0Xj7_8-qfMUSvS_-A9u0UDVhtjuEGijTSStmQ')"}}></div>
+                                            <div class="absolute inset-x-0 bottom-4 text-center">
+                                                <span class="text-xl font-bold bg-white/90 text-black px-4 py-1 rounded">マジで最高でした！</span>
+                                            </div>
+                                        </div>
+                                        <button class="w-full h-12 bg-white dark:bg-white/5 border dark:border-white/10 rounded-lg flex items-center justify-center gap-2 font-bold"><span class="material-symbols-outlined text-primary">play_circle</span> この字幕を再生</button>
+                                    </div>
+                                    <div class="space-y-6">
+                                        <div class="space-y-2">
+                                            <label class="text-xs font-bold text-slate-500 uppercase">字幕テキスト</label>
+                                            <textarea class="w-full h-32 p-4 rounded-lg bg-gray-50 dark:bg-slate-800 border dark:border-white/10 text-lg font-bold outline-none focus:ring-2 focus:ring-primary" defaultValue="マジで最高でした！"></textarea>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div class="space-y-2">
+                                                <label class="text-xs font-bold text-slate-500 uppercase">スタイル</label>
+                                                <select class="w-full h-10 px-4 bg-gray-50 dark:bg-slate-800 border dark:border-white/10 rounded-lg text-sm">
+                                                    <option>YouTuber定番</option>
+                                                    <option>強調</option>
+                                                    <option>ささやき</option>
+                                                </select>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <label class="text-xs font-bold text-slate-500 uppercase">アニメーション</label>
+                                                <select class="w-full h-10 px-4 bg-gray-50 dark:bg-slate-800 border dark:border-white/10 rounded-lg text-sm">
+                                                    <option>バウンス</option>
+                                                    <option>フェード</option>
+                                                    <option>なし</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-end gap-3 pt-6">
+                                            <button onClick={() => setShowSubtitleEdit(false)} class="px-6 py-2.5 rounded-lg border dark:border-white/20 font-bold">キャンセル</button>
+                                            <button onClick={() => setShowSubtitleEdit(false)} class="px-10 py-2.5 rounded-lg bg-primary text-white font-bold shadow-lg">保存して戻る</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const PricingPage = () => {
+            const navigate = useNavigate();
+            return (
+                <div class="min-h-screen bg-white text-[#1c130d] flex flex-col">
+                    <header class="sticky top-0 z-50 w-full border-b border-[#f4ece6] bg-[#fcfaf8]/95 backdrop-blur-sm">
+                        <div class="mx-auto flex h-16 max-w-[960px] items-center justify-between px-4">
+                            <div onClick={() => navigate('/')} class="flex items-center gap-2 cursor-pointer">
+                                <div class="size-6 text-primary">
+                                    <svg class="w-full h-full" fill="currentColor" viewBox="0 0 48 48"><path d="M4 42.4379C4 42.4379 14.0962 36.0744 24 41.1692C35.0664 46.8624 44 42.2078 44 42.2078L44 7.01134C44 7.01134 35.068 11.6577 24.0031 5.96913C14.0971 0.876274 4 7.27094 4 7.27094L4 42.4379Z"></path></svg>
+                                </div>
+                                <span class="text-lg font-bold">SakuEdit</span>
+                            </div>
+                        </div>
+                    </header>
+                    <main class="flex-grow flex flex-col items-center pt-16 px-4 pb-20">
+                        <h1 class="text-3xl font-bold mb-12">料金プラン</h1>
+                        <div class="grid w-full max-w-[900px] grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="rounded-xl border border-gray-200 p-8 flex flex-col">
+                                <h3 class="text-xl font-bold mb-4">無料プラン</h3>
+                                <div class="flex items-baseline gap-1 mb-8">
+                                    <span class="text-5xl font-extrabold">¥0</span>
+                                    <span class="text-sm text-gray-500">/月</span>
+                                </div>
+                                <ul class="space-y-4 mb-10 flex-grow">
+                                    <li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-600">check</span> 字幕自動生成 (月3本)</li>
+                                    <li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-600">check</span> 720p書き出し</li>
+                                    <li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-600">check</span> ウォーターマーク付</li>
+                                </ul>
+                                <button onClick={() => navigate('/')} class="w-full py-3 border border-gray-200 font-bold rounded-lg hover:bg-gray-50 transition-colors">無料で始める</button>
+                            </div>
+                            <div class="rounded-xl border-t-4 border-t-primary border-gray-200 p-8 shadow-xl shadow-orange-100 flex flex-col relative">
+                                <div class="absolute right-4 top-4 bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-full">おすすめ</div>
+                                <h3 class="text-xl font-bold mb-4">PROプラン</h3>
+                                <div class="flex items-baseline gap-1 mb-2">
+                                    <span class="text-5xl font-extrabold">¥1,000</span>
+                                    <span class="text-sm text-gray-500">/月</span>
+                                </div>
+                                <p class="text-primary text-sm font-bold mb-8">¥10,000/年 (2ヶ月分お得)</p>
+                                <ul class="space-y-4 mb-10 flex-grow">
+                                    <li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-600">check</span> 字幕無制限</li>
+                                    <li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-600">check</span> 1080p/4K書き出し</li>
+                                    <li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-600">check</span> ウォーターマークなし</li>
+                                    <li class="flex items-center gap-2"><span class="material-symbols-outlined text-green-600">check</span> 独自スタイル学習</li>
+                                </ul>
+                                <button onClick={() => navigate('/')} class="w-full py-3 bg-primary text-white font-bold rounded-lg shadow-lg hover:bg-primary-hover transition-colors">PROを始める</button>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        // --- App Entry Point ---
+
+        const App = () => {
+            const location = useLocation();
+            
+            // Effect to manage light/dark mode based on page
+            useEffect(() => {
+                if (location.pathname === '/editor' || location.pathname === '/processing' || location.pathname === '/style-learning') {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
+                } else {
+                    document.documentElement.classList.add('light');
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [location]);
+
+            return (
+                <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/projects" element={<ProjectsPage />} />
+                    <Route path="/styles" element={<StylesPage />} />
+                    <Route path="/pricing" element={<PricingPage />} />
+                    <Route path="/editor" element={<EditorPage />} />
+                    <Route path="/processing" element={<ProcessingPage />} />
+                    <Route path="/style-learning" element={<StyleLearningPage />} />
+                </Routes>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(
+            <MemoryRouter>
+                <App />
+            </MemoryRouter>
+        );
+    </script>
+</body>
+</html>

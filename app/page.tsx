@@ -7,7 +7,7 @@ export default function LandingPage() {
       <nav className="border-b border-border backdrop-blur-sm bg-background/80 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-test-id="header-logo">
               <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">S</span>
               </div>
@@ -22,12 +22,13 @@ export default function LandingPage() {
               <Link href="#how-it-works" className="text-muted hover:text-foreground transition-colors">
                 使い方
               </Link>
-              <Link href="#pricing" className="text-muted hover:text-foreground transition-colors">
+              <Link href="/pricing" className="text-muted hover:text-foreground transition-colors" data-test-id="header-pricing-link">
                 料金
               </Link>
               <Link
                 href="/home"
                 className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors font-medium"
+                data-test-id="landing-start-editing-button"
               >
                 今すぐ始める
               </Link>
@@ -61,6 +62,7 @@ export default function LandingPage() {
             <Link
               href="/home"
               className="px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold text-lg hover:shadow-xl hover:shadow-primary/50 transition-all transform hover:-translate-y-1"
+              data-test-id="cta-start-free"
             >
               無料で始める
             </Link>

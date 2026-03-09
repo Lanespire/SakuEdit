@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html class="light" lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>字幕詳細編集 - SakuEdit</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#F97316",
+                        "primary-hover": "#ea580c",
+                        "background-light": "#fff7ed",
+                        "background-dark": "#1c1917",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "Noto Sans JP", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "2xl": "2rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #e5e7eb;
+            border-radius: 20px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white overflow-hidden h-screen w-full relative">
+<div class="absolute inset-0 flex flex-col opacity-40 pointer-events-none select-none filter blur-[1px]">
+<div class="h-16 border-b border-slate-200 bg-white dark:bg-slate-900 w-full"></div>
+<div class="flex-1 flex bg-slate-100 dark:bg-slate-800 p-8 justify-center items-center">
+<div class="w-full max-w-4xl aspect-video bg-slate-300 dark:bg-slate-700 rounded-lg"></div>
+</div>
+<div class="h-64 bg-white dark:bg-slate-900 border-t border-slate-200"></div>
+</div>
+<div class="fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
+<div class="pointer-events-auto w-full max-w-[1200px] bg-white dark:bg-[#1a1614] rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col h-[85vh] border-t border-white/10 relative transform transition-transform duration-300 ease-out">
+<div class="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing hover:bg-slate-50 dark:hover:bg-white/5 rounded-t-2xl transition-colors">
+<div class="w-16 h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full"></div>
+</div>
+<div class="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between shrink-0 gap-4">
+<div class="flex items-center gap-4 flex-1">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined">tune</span>
+</div>
+<h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">字幕詳細編集</h2>
+<span class="text-slate-400 text-sm font-medium pt-1 border-l border-slate-200 dark:border-white/10 pl-4">#12 / 45</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center justify-center h-9 px-4 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 text-sm font-bold transition-colors">
+<span class="material-symbols-outlined text-[18px] mr-1">chevron_left</span>
+                        前
+                    </button>
+<button class="flex items-center justify-center h-9 px-4 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 text-sm font-bold transition-colors">
+                        次
+                        <span class="material-symbols-outlined text-[18px] ml-1">chevron_right</span>
+</button>
+</div>
+<div class="flex-1 flex justify-end">
+<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto px-6 py-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+<div class="lg:col-span-4 flex flex-col gap-5">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">preview</span>
+                                プレビュー
+                            </label>
+<div class="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-900 group shadow-md border border-slate-200 dark:border-white/5">
+<img alt="Video frame" class="w-full h-full object-cover opacity-80" data-alt="Office meeting scene with blurred background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAL4K9F_1XQnBVV5bJ9RN0VzEhFSO1oEx3ShG4WYjG63lzpkOD4XlgUPxwsSAQD8QQaZYbkgt0uuMtS31WlHUW0NFZ2tVeuJvLA_zY5hrsO3SYETFVj9pApuCWqBorMR1TSfUl0LjwsI1mkO2MAL_p2fmsJWpSgj1jLKrltGqYKDsmyrCqLUjHBe0sLss5TuPxbtAHOjud6rAJEuoFkzpzkgy2qhd0YmKuDkF6n9aKaOfDBxmzzyFFhOtUThr0rtR2PvPiIp9adZkD3"/>
+<div class="absolute inset-0 flex items-end justify-center pb-8 px-8">
+<p class="text-white text-lg font-bold drop-shadow-md text-center leading-tight bg-black/40 px-2 py-1 rounded">
+                                        プロジェクトの進捗状況を<br/>確認しましょう
+                                    </p>
+</div>
+<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+<button class="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm hover:bg-primary text-white transition-colors shadow-lg">
+<span class="material-symbols-outlined text-[28px] fill">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 h-12 bg-white dark:bg-white/5 hover:bg-slate-50 dark:hover:bg-white/10 text-slate-900 dark:text-white font-bold rounded-lg transition-colors border border-slate-200 dark:border-white/10 hover:border-primary/50 dark:hover:border-primary/50 group">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">play_circle</span>
+<span>この字幕を再生</span>
+</button>
+<div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-100 dark:border-white/5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400">graphic_eq</span>
+<span class="text-sm font-medium text-slate-700 dark:text-slate-300">波形で微調整</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+<div class="lg:col-span-8 flex flex-col gap-8">
+<div class="flex flex-col gap-3">
+<div class="flex justify-between items-end">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">subtitles</span>
+                                字幕テキスト
+                            </label>
+<span class="text-xs text-slate-400 font-medium bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded">24 / 40文字</span>
+</div>
+<div class="relative group">
+<textarea class="w-full min-h-[120px] p-4 text-lg leading-relaxed rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#2a2420] text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none resize-none transition-shadow font-medium" placeholder="ここに字幕を入力...">プロジェクトの進捗状況を確認しましょう</textarea>
+<div class="absolute bottom-3 right-3 flex items-center gap-1 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-white/10 rounded-lg p-1">
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 font-bold" title="太字">B</button>
+<div class="w-px h-4 bg-slate-200 dark:bg-white/10 mx-1"></div>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400" title="文字色">
+<span class="material-symbols-outlined text-[20px]">format_color_text</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400" title="サイズ">
+<span class="material-symbols-outlined text-[20px]">format_size</span>
+</button>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">timer</span>
+                                開始時間
+                            </label>
+<div class="flex items-center bg-slate-50 dark:bg-[#2a2420] rounded-lg border border-slate-200 dark:border-white/10 p-1 group focus-within:ring-1 focus-within:ring-primary focus-within:border-primary/50 transition-all">
+<button class="w-8 h-10 flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<input class="flex-1 bg-transparent border-none text-center font-mono text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-0 p-0" type="text" value="00:42.500"/>
+<button class="w-8 h-10 flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">timer_off</span>
+                                終了時間
+                            </label>
+<div class="flex items-center bg-slate-50 dark:bg-[#2a2420] rounded-lg border border-slate-200 dark:border-white/10 p-1 group focus-within:ring-1 focus-within:ring-primary focus-within:border-primary/50 transition-all">
+<button class="w-8 h-10 flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<input class="flex-1 bg-transparent border-none text-center font-mono text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-0 p-0" type="text" value="00:45.200"/>
+<button class="w-8 h-10 flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+                                長さ
+                            </label>
+<div class="flex items-center justify-center h-[50px] bg-slate-100 dark:bg-white/5 rounded-lg border border-transparent text-slate-500 dark:text-slate-400">
+<span class="font-mono font-bold text-sm">2.7秒</span>
+</div>
+</div>
+</div>
+<hr class="border-slate-100 dark:border-white/5"/>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="flex flex-col gap-5">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">style</span>
+                                スタイルプリセット
+                            </label>
+<div class="relative">
+<select class="w-full appearance-none h-11 pl-4 pr-10 bg-slate-50 dark:bg-[#2a2420] border border-slate-200 dark:border-white/10 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
+<option>標準スタイル</option>
+<option>強調（赤文字・太字）</option>
+<option>ささやき（小・グレー）</option>
+<option>叫び（大・揺れ）</option>
+</select>
+<div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-500">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">animation</span>
+                                アニメーション
+                            </label>
+<div class="relative">
+<select class="w-full appearance-none h-11 pl-4 pr-10 bg-slate-50 dark:bg-[#2a2420] border border-slate-200 dark:border-white/10 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
+<option>なし</option>
+<option>フェードイン</option>
+<option>バウンス</option>
+<option>タイプライター</option>
+</select>
+<div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-500">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">grid_view</span>
+                                配置
+                            </label>
+<div class="flex items-start gap-4">
+<div class="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-100 dark:bg-white/5 rounded-lg w-max border border-slate-200 dark:border-white/5">
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+<button class="w-8 h-8 rounded bg-primary shadow-sm ring-2 ring-primary/30 relative">
+<span class="absolute inset-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[16px] font-bold">check</span>
+</span>
+</button>
+<button class="w-8 h-8 rounded bg-white dark:bg-[#2a2420] hover:bg-slate-200 dark:hover:bg-white/20 transition-colors shadow-sm"></button>
+</div>
+<div class="text-xs text-slate-500 leading-relaxed mt-1 max-w-[150px]">
+                                        グリッドを選択して、画面上の字幕位置を調整します。
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="px-6 py-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-[#1a1614] flex justify-between items-center shrink-0">
+<button class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold text-sm transition-colors group">
+<span class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">delete</span>
+                    削除
+                </button>
+<div class="flex items-center gap-3">
+<button class="px-6 py-2.5 rounded-lg border border-slate-300 dark:border-white/20 text-slate-700 dark:text-slate-200 font-bold text-sm hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                        キャンセル
+                    </button>
+<button class="px-8 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:translate-y-0.5 flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">save</span>
+                        保存
+                    </button>
+</div>
+</div>
+</div>
+</div></div>
+</body></html>

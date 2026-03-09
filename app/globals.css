@@ -1,75 +1,147 @@
 @import "tailwindcss";
 
 :root {
-  /* SakuEdit Brand Colors */
-  --primary: #8B5CF6;        /* Purple - primary brand */
-  --primary-dark: #7C3AED;
-  --secondary: #EC4899;      /* Pink accent */
-  --accent: #F59E0B;         /* Amber for highlights */
+  /* SakuEdit Brand Colors - Based on UI Design */
+  --primary: #f97415;           /* Orange - primary brand */
+  --primary-light: #ff9f5e;     /* Light orange */
+  --primary-dark: #ea580c;      /* Dark orange */
+  --secondary: #ffb57c;         /* Warm secondary orange */
+  --accent: #ffd9bf;            /* Soft peach accent */
 
-  /* Neutral Palette */
-  --background: #0A0A0F;     /* Deep dark background */
-  --surface: #1A1A24;        /* Card/panel surface */
-  --surface-hover: #252530;
-  --border: #2D2D3A;
+  /* Background Colors */
+  --background-light: #fcfaf8;
+  --background-dark: #23170f;
+  --background: var(--background-light);
 
-  /* Text */
-  --foreground: #F5F5F7;     /* Primary text */
-  --muted: #9CA3AF;          /* Secondary text */
+  /* Surface Colors */
+  --surface-light: #ffffff;
+  --surface-dark: #2a1d15;
+  --surface-darker: #1a110a;
+  --surface: var(--surface-light);
+  --surface-hover: #f7efe8;
+
+  /* Text Colors */
+  --text-main: #1c130d;
+  --text-sub: #9e6b47;
+  --text-muted: #6b584b;
+  --foreground: var(--text-main);
+  --muted: var(--text-muted);
+
+  /* Border Colors */
+  --border-main: #f0e6df;
+  --border-dark: #3a2e26;
+  --border: var(--border-main);
 
   /* Semantic Colors */
-  --success: #10B981;
-  --warning: #F59E0B;
-  --error: #EF4444;
-  --info: #3B82F6;
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+.dark,
+body.dark {
+  --background: var(--background-dark);
+  --surface: var(--surface-dark);
+  --surface-hover: #36271e;
+  --foreground: #fcfaf8;
+  --muted: #c7a892;
+  --border: var(--border-dark);
 }
 
 @theme inline {
-  /* Colors */
+  /* Primary Colors */
   --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
   --color-primary-dark: var(--primary-dark);
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
 
+  /* Background Colors */
   --color-background: var(--background);
+  --color-background-light: var(--background-light);
+  --color-background-dark: var(--background-dark);
+
+  /* Surface Colors */
   --color-surface: var(--surface);
   --color-surface-hover: var(--surface-hover);
-  --color-border: var(--border);
+  --color-panel-dark: #2c1e16;
+  --color-panel-lighter: #3a2a20;
 
+  /* Text Colors */
   --color-foreground: var(--foreground);
+  --color-text-main: var(--foreground);
+  --color-text-sub: var(--text-sub);
   --color-muted: var(--muted);
 
+  /* Border Colors */
+  --color-border: var(--border);
+  --color-border-main: var(--border);
+  --color-border-dark: var(--border-dark);
+
+  /* Semantic Colors */
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-error: var(--error);
   --color-info: var(--info);
 
   /* Typography */
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Noto Sans JP', 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Smooth scroll */
 html {
   scroll-behavior: smooth;
 }
 
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--background);
+  color: var(--foreground);
+}
+
 /* Selection */
 ::selection {
-  background: var(--primary);
-  color: white;
+  background: rgba(249, 116, 21, 0.3);
+  color: var(--primary);
+}
+
+/* Custom scrollbar hide utility */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Timeline scroll */
+.timeline-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.timeline-scroll::-webkit-scrollbar-track {
+  background: #23170f;
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background: #4a3221;
+  border-radius: 4px;
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: #5c402b;
+}
+
+/* Material Symbols configuration */
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
 }

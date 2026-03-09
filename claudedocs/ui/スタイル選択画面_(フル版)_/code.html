@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html class="light" lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>スタイル選択画面 - SakuEdit</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700;900&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#F97316",
+                        "background-light": "#fffaf5",
+                        "background-dark": "#1a100a",
+                        "text-main": "#2d1f18",
+                        "text-sub": "#8a756b",
+                        "border-main": "#f0e6df",
+                    },
+                    fontFamily: {
+                        "display": ["Be Vietnam Pro", "Noto Sans", "sans-serif"],
+                        "body": ["Be Vietnam Pro", "Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                    boxShadow: {
+                        'glow': '0 0 20px -5px rgba(249, 115, 22, 0.3)',
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-text-main antialiased min-h-screen flex flex-col selection:bg-primary/20 selection:text-primary">
+<header class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-main px-6 py-4">
+<div class="max-w-7xl mx-auto flex items-center justify-between gap-6">
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-orange-50 rounded-full transition-colors text-text-main group">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">arrow_back</span>
+</button>
+<h1 class="text-2xl font-bold tracking-tight text-text-main">編集スタイルを選ぶ</h1>
+</div>
+<div class="flex-1 max-w-xl">
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-text-sub group-focus-within:text-primary transition-colors">search</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-2.5 border-none rounded-xl bg-gray-50 text-text-main placeholder-text-sub focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm" placeholder="スタイルを検索..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 px-4 py-2 bg-white border border-border-main rounded-xl text-sm font-medium hover:bg-orange-50 hover:border-orange-200 hover:text-primary shadow-sm transition-all duration-300">
+<span class="material-symbols-outlined text-primary text-xl">help</span>
+<span>ヘルプ</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-cover bg-center border-2 border-white shadow-md ring-2 ring-orange-100" data-alt="User profile avatar showing a smiling person" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQZoLRCjZ8LA_E3iVhRWsrExqkxEARHUlM7da5yDVzZgnGOwQ9fgz-y9n_UFHClfCPGZv6ib5iyGUWKgt6RvIl__q51WwehT7_xlJA97RARefSTxXGkmRNbHZQRF3VQ82gEEu3NdHh198AC5Cogpw1ZNG-l9y4gZpeDkguiq40e8iVPjVcghDqQIyeAnlN2cpIQstbzEifANDVX8r6UgiRKIXPx0L9pqmjqxt_TDhSQ9psnILhFMJX_E4EDMotM85mufvtA8Ow5Ml6');">
+</div>
+</div>
+</div>
+</header>
+<main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
+<div class="mb-8 overflow-x-auto scrollbar-hide">
+<nav class="flex space-x-8 border-b border-border-main min-w-max">
+<a class="pb-4 px-2 border-b-[3px] border-primary text-primary font-bold text-sm tracking-wide" href="#">
+                    プリセット
+                </a>
+<a class="pb-4 px-2 border-b-[3px] border-transparent text-text-sub hover:text-primary hover:border-orange-200 font-medium text-sm transition-all tracking-wide" href="#popular">
+                    人気クリエイター
+                </a>
+<a class="pb-4 px-2 border-b-[3px] border-transparent text-text-sub hover:text-primary hover:border-orange-200 font-medium text-sm transition-all tracking-wide" href="#url">
+                    URLから学習
+                </a>
+<a class="pb-4 px-2 border-b-[3px] border-transparent text-text-sub hover:text-primary hover:border-orange-200 font-medium text-sm transition-all tracking-wide flex items-center gap-1 group" href="#pro">
+                    マイスタイル PRO
+                    <span class="bg-gradient-to-r from-orange-400 to-orange-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 shadow-sm group-hover:shadow-md transition-shadow">PRO</span>
+</a>
+</nav>
+</div>
+<section class="space-y-8 animate-fade-in">
+<div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+<button class="px-5 py-2 bg-primary text-white rounded-full text-sm font-medium shadow-md shadow-orange-200 whitespace-nowrap hover:bg-orange-600 transition-colors">
+                    すべて
+                </button>
+<button class="px-5 py-2 bg-white border border-border-main text-text-sub hover:text-primary hover:border-primary/50 hover:bg-orange-50 rounded-full text-sm font-medium transition-all whitespace-nowrap">
+                    エンタメ
+                </button>
+<button class="px-5 py-2 bg-white border border-border-main text-text-sub hover:text-primary hover:border-primary/50 hover:bg-orange-50 rounded-full text-sm font-medium transition-all whitespace-nowrap">
+                    教育
+                </button>
+<button class="px-5 py-2 bg-white border border-border-main text-text-sub hover:text-primary hover:border-primary/50 hover:bg-orange-50 rounded-full text-sm font-medium transition-all whitespace-nowrap">
+                    ビジネス
+                </button>
+<button class="px-5 py-2 bg-white border border-border-main text-text-sub hover:text-primary hover:border-primary/50 hover:bg-orange-50 rounded-full text-sm font-medium transition-all whitespace-nowrap">
+                    Vlog
+                </button>
+<button class="px-5 py-2 bg-white border border-border-main text-text-sub hover:text-primary hover:border-primary/50 hover:bg-orange-50 rounded-full text-sm font-medium transition-all whitespace-nowrap">
+                    ゲーム
+                </button>
+<button class="px-5 py-2 bg-white border border-border-main text-text-sub hover:text-primary hover:border-primary/50 hover:bg-orange-50 rounded-full text-sm font-medium transition-all whitespace-nowrap">
+                    Shorts
+                </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="group bg-white rounded-xl overflow-hidden border border-border-main hover:shadow-glow hover:border-primary/40 transition-all duration-300 flex flex-col">
+<div class="relative aspect-video overflow-hidden bg-gray-100">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Colorful youtube thumbnail style with bold text and expressive face" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCNKMKWEeUIiJrCDsrfYV8p4_UxLmcByE6EHA77NXDYE-PTZFsMXHrdaqMhZduPuS08z-54e4HtLpddWmc7dgXTSNMHMz7TzrKjwEIxmZj5-BkYukOfT9Cqxe7MGfH_aJMlGKTPJAbZx1u26Ocs7BLTOcRPDtZcWBTgp24pOtYjYeU7cG0shdcyvJTyKu4FXVxfGuDTQ3Yj82NOsfSLIDS9GkUBb-Z7tmexN2P25fuqDukzX5E41QEElIpq5jYsHn5O449FKVzJoSGo');"></div>
+<div class="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
+<div class="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-lg flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">play_circle</span> プレビュー
+                        </div>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">YouTuber定番</h3>
+<span class="bg-orange-50 text-orange-600 border border-orange-100 text-xs px-2 py-1 rounded-md font-medium">エンタメ</span>
+</div>
+<p class="text-text-sub text-sm mb-4 line-clamp-2">テンポ良いカット編集と、ポップで読みやすい字幕スタイル。SEも効果的に配置されます。</p>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center text-xs text-text-sub gap-1">
+<span class="material-symbols-outlined text-[16px]">group</span>
+                                12,345人が使用
+                            </div>
+<button class="bg-primary hover:bg-orange-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-orange-200">
+                                適用する
+                            </button>
+</div>
+</div>
+</div>
+<div class="group bg-white rounded-xl overflow-hidden border border-border-main hover:shadow-glow hover:border-primary/40 transition-all duration-300 flex flex-col">
+<div class="relative aspect-video overflow-hidden bg-gray-100">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Clean business presentation style video thumbnail with charts" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB9KYL_K-2_0j6NAKn-IU6cjzSakHxl9YhGiwoYOEpA9b4lvtmb8WElCfpr689Bc3eKAfAhogn2Q_hwDZyt-ZViYkYoZPoAfFTXE_U2LVW2ML8QyuDD3twMm6Lh0cCclTgwFR6WigeETeUCkxr_TswZf7MntKymfNe7BomHhhWdSSZB84L91s6f96hGFNTW_4C7rMMnFZ56EkDeQNRWU7vQqXxWbc8c1E2NAR_0JX4q4YO-GncqJUs_kV1bq7AZi-7NYiPVECKkrQJ3');"></div>
+<div class="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Business</div>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">ビジネス・セミナー</h3>
+<span class="bg-blue-50 text-blue-600 border border-blue-100 text-xs px-2 py-1 rounded-md font-medium">解説</span>
+</div>
+<p class="text-text-sub text-sm mb-4 line-clamp-2">落ち着いた配色と明朝体の字幕。長めのカット割りで信頼感のある演出に適しています。</p>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center text-xs text-text-sub gap-1">
+<span class="material-symbols-outlined text-[16px]">group</span>
+                                8,920人が使用
+                            </div>
+<button class="bg-primary hover:bg-orange-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-orange-200">
+                                適用する
+                            </button>
+</div>
+</div>
+</div>
+<div class="group bg-white rounded-xl overflow-hidden border border-primary/40 hover:shadow-glow hover:border-primary transition-all duration-300 flex flex-col ring-2 ring-primary/20 ring-offset-2 ring-offset-background-light">
+<div class="relative aspect-video overflow-hidden bg-gray-100">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Vertical video format thumbnail for mobile shorts" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCN6jrUtb29pVTAQiSGMUkXHgCr97pPNrAtRUBEZSGAMyjsXjVYOi5kttgbZ055wCXy4owMBNXk43K_aZTaFHCbmVYWGnEJqrih5R6my15lN5-LFshtBGUtCQg7vQn6e70ZaabD0SOyI7xzYRUJdOqhLjW9xbm5V0O-iejLtOGMdHt54V8rRdIAcq-Rl0NY9y3zcrj-rbP6nKEgG3_IWFXNsomGkCKCJo9EmhM7nByZ1ka5BV-F7P9r3-45d8cMw-ZIcTTVWPlkCjUN');"></div>
+<div class="absolute bottom-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
+<span class="text-white text-xs font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-yellow-400">bolt</span>
+                                 人気急上昇
+                             </span>
+</div>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">Shorts最適化</h3>
+<span class="bg-purple-50 text-purple-600 border border-purple-100 text-xs px-2 py-1 rounded-md font-medium">9:16</span>
+</div>
+<p class="text-text-sub text-sm mb-4 line-clamp-2">縦型動画専用。中央に大きく表示される字幕と、飽きさせない超高速カット編集。</p>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center text-xs text-text-sub gap-1">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+                                今週 +15%
+                            </div>
+<button class="bg-primary hover:bg-orange-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-orange-200">
+                                適用する
+                            </button>
+</div>
+</div>
+</div>
+<div class="group bg-white rounded-xl overflow-hidden border border-border-main hover:shadow-glow hover:border-primary/40 transition-all duration-300 flex flex-col">
+<div class="relative aspect-video overflow-hidden bg-gray-100">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Cinematic movie style with dark mood and letterbox bars" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDxC-Q4GhTEG_y4ey1j-A5-wxaQ-Ekyt872Z2vzGDGN8AmLnLh0bDbt7cFg0U-e3QcZak-vUuhBh4CMbNZ7SmLRxdqBcRDHqvFC1DHrhWF_OhRH6A1kR06AeOt98OK9qqqWkQk6NA707TMbTSUPKLEet1sDRnGpvneN0EzTu2QAF01hPdWZrV6jb8cic-beeMqV8ZP1ACRsv3gQJbM3X4bFju4C2p-VnuJG6Ocf7NKSPLhtxfM2v69VzmTMXLK7PPHPMxQzTG7RbLBx');"></div>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">映画風シネマ</h3>
+<span class="bg-stone-100 text-stone-600 border border-stone-200 text-xs px-2 py-1 rounded-md font-medium">Vlog</span>
+</div>
+<p class="text-text-sub text-sm mb-4 line-clamp-2">21:9のレターボックス、カラーグレーディング、控えめで上品な字幕スタイル。</p>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center text-xs text-text-sub gap-1">
+<span class="material-symbols-outlined text-[16px]">group</span>
+                                4,100人が使用
+                            </div>
+<button class="bg-primary hover:bg-orange-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-orange-200">
+                                適用する
+                            </button>
+</div>
+</div>
+</div>
+<div class="group bg-white rounded-xl overflow-hidden border border-border-main hover:shadow-glow hover:border-primary/40 transition-all duration-300 flex flex-col">
+<div class="relative aspect-video overflow-hidden bg-gray-100">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Educational video style with diagrams and clear text" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC4XUMJWnm93iSbR11N2tviRZzLHnEksejTkEBmiYa1-E3DVS0pXPs7GRgzYK6Xxz5y76ebbuCssa4v7OKzJ2MyBWs5DJnMheDTIdX1D1HBW3PGazOAIqEdxMsV8AJttYOBK4ZKOgNMp47Ir9ANVN2tSI4RraxSNbEMSBBnvw3tydEkPAA_htq6TVTnjMiLyobScEgnxEGz7FsyxruqYs_osBvcdPoX5DRc1qBT9rhpGo5i5hqUPseEVJ3XrZE0fuUB_rOBv982RoCa');"></div>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">ずんだもん風・解説</h3>
+<span class="bg-green-50 text-green-600 border border-green-100 text-xs px-2 py-1 rounded-md font-medium">教育</span>
+</div>
+<p class="text-text-sub text-sm mb-4 line-clamp-2">キャラクター立ち絵の配置スペースを確保。強調表現を多用したわかりやすい解説向け。</p>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center text-xs text-text-sub gap-1">
+<span class="material-symbols-outlined text-[16px]">group</span>
+                                15,200人が使用
+                            </div>
+<button class="bg-primary hover:bg-orange-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-orange-200">
+                                適用する
+                            </button>
+</div>
+</div>
+</div>
+<div class="group bg-white rounded-xl overflow-hidden border border-border-main hover:shadow-glow hover:border-primary/40 transition-all duration-300 flex flex-col">
+<div class="relative aspect-video overflow-hidden bg-gray-100">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Gaming video style with high contrast and neon elements" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBQMZirVm7cQZkV-ktMX8c7PRa3NlSTzwBVmXtx0qsdMwzZS7neOFvWfm2f39pCF33OgdPBpF1FdHPI1UPE-ZNLSOPcAhd_r5-XTNdgqdxCFOnZLtZhClauE0lquzffof3jZ2vlbZnv1dXUd-JZGO2hfs57RGBKV7aPhLxrMiBF6mmZz9gk4xAPlsg4dRwU8igWJnsSTkL9Jr-VlDyJmUzxcO7uXORTzsNVSwEFQnJ7NmEt4RSMD2B6RpbOc9t0YInIq069aVNIEvdc');"></div>
+</div>
+<div class="p-5 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">ゲーム実況ハイライト</h3>
+<span class="bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs px-2 py-1 rounded-md font-medium">ゲーム</span>
+</div>
+<p class="text-text-sub text-sm mb-4 line-clamp-2">盛り上がるシーンを自動抽出。叫び声や笑い声に合わせた派手なテロップ演出。</p>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center text-xs text-text-sub gap-1">
+<span class="material-symbols-outlined text-[16px]">group</span>
+                                7,800人が使用
+                            </div>
+<button class="bg-primary hover:bg-orange-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors shadow-sm shadow-orange-200">
+                                適用する
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<div class="my-16 border-t border-dashed border-border-main relative">
+<span class="absolute top-[-10px] left-1/2 -translate-x-1/2 bg-background-light px-4 text-xs text-text-sub">以下、タブ切り替えイメージ</span>
+</div>
+<section class="space-y-6" id="popular">
+<h2 class="text-xl font-bold text-text-main flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">verified</span>
+                人気クリエイターのスタイル
+            </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-white rounded-xl p-6 border border-border-main flex gap-6 hover:shadow-glow hover:border-primary/30 transition-all">
+<div class="flex flex-col gap-4 w-1/3 min-w-[120px]">
+<div class="flex flex-col items-center text-center">
+<div class="w-20 h-20 rounded-full bg-gray-200 border-4 border-orange-50 mb-3 overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20">
+<img alt="Creator Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCuZVl4tJil0J97SQB-Ovej1RgVoDMF__MDYo7EPfA2IquEX_qZsQgrzu6bNfqwxwzrgoHKA-ymQj2VNY6osZROEEPwWcPYLv0cPuOtvLmECIQ_dWjiiwWkoXD--DoqqgaUsPJSSMKEslzHqOHqFlDku4j8BGvcH5fdFzE6hhH0P8QbkX9fgYN9qZdGWdqRkAHlLc4-NaKtHo0IUsU8ymSuLhPMzyjiMR1BIDkALBIcdGvreJG2VtTHV9zjaHL_p1ZHGUcY9PPqxXe"/>
+</div>
+<h3 class="font-bold text-lg leading-tight">TOP YouTuber</h3>
+<p class="text-xs text-text-sub mt-1">登録者 1,200万人</p>
+</div>
+<div class="flex flex-wrap gap-1 justify-center">
+<span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded">#エンタメ</span>
+<span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded">#SE多め</span>
+</div>
+</div>
+<div class="flex-1 flex flex-col">
+<div class="bg-gray-100 rounded-lg aspect-video mb-4 w-full overflow-hidden relative group/video">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Video thumbnail showing a person reacting with large colorful text overlay" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAIzwStFT53lFiBqirn9Vo0tGi-7puU0qHlS1oE2prffYeZ-NHkiM3JOhxApd4M7MjXxoKvBI8KB_p6tA_aOZ__PWJ-lvR7hMvpI3am3WgYJOaxjuVx2jKPdKGXs9qIeLQ0Af_ULeSXmMFfn_DAFnD3FOUYTvPt01KkOemBFd_BbJyRzhGyQvTygrFL_Xg7V_AkEvGpwJUjg4ePLSd-w0l8_sehagh3fQEBhwMlVCZltNEUf48875SEEjG18Tss2npdOu1y87LEDadC');"></div>
+<div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-black/10 transition-colors">
+<span class="material-symbols-outlined text-white text-4xl opacity-80 group-hover/video:scale-110 transition-transform drop-shadow-lg">play_circle</span>
+</div>
+</div>
+<button class="mt-auto w-full bg-primary text-white font-bold py-3 rounded-xl shadow-md shadow-orange-200 hover:bg-orange-600 hover:shadow-lg transition-all flex justify-center items-center gap-2 group/btn">
+<span>このスタイルを使う</span>
+<span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="bg-white rounded-xl p-6 border border-border-main flex gap-6 hover:shadow-glow hover:border-primary/30 transition-all">
+<div class="flex flex-col gap-4 w-1/3 min-w-[120px]">
+<div class="flex flex-col items-center text-center">
+<div class="w-20 h-20 rounded-full bg-gray-200 border-4 border-orange-50 mb-3 overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20">
+<img alt="Creator Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNEgxY00BFXHew90fG43OrYX8_xaDtVeKjGkliIjy_cgQS10rQLkUx2kltkhYUKBlLClB8C0VyYANfMEz3U9RCE7U-1rpusBy5XDs6drgVCrOBWXXpG-wXamAcuGQRoPngDt80bQMQjVbP9wZ31oAmuF8T4CqX3zmZgfAdJ-lyg8XqhYiePf73iewQzKfU6TTs2--tMdJKKwnwM8TmIyebNmOMjtcFvuPOQ3iRVEpdRuPtgCiJgj8Fc3_0J5lSO37hSaolUkWO6_Nx"/>
+</div>
+<h3 class="font-bold text-lg leading-tight">Lifestyle Vlog</h3>
+<p class="text-xs text-text-sub mt-1">登録者 85万人</p>
+</div>
+<div class="flex flex-wrap gap-1 justify-center">
+<span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded">#日常</span>
+<span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded">#お洒落</span>
+</div>
+</div>
+<div class="flex-1 flex flex-col">
+<div class="bg-gray-100 rounded-lg aspect-video mb-4 w-full overflow-hidden relative group/video">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Soft aesthetic video thumbnail of a cafe setting" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBQ-PaPb8vKFUOWKoUpOR0SHFA2h46euctPw9T6u4-vz_rJ-M2Njy2NVJYA9kSShQ_lwDGGzyEDTQoAoE1YNEupJh_bIAxL82UuzjlqXzu211KeB74vShlZWyZxkDKsOjgziJldG8Pn6ZGEPSd00rF2vaXdgvGmrbwE_ZkRcDNutLvUfXFEwfT9uJwlttliQqDl21G7BNOcl7ZVU_JEawU9mPX2Fb1w-ngvIR4wky5GkLEX1TrVgg2BtHH3bh4Pj36zI4LIfjZkobzk');"></div>
+<div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-black/10 transition-colors">
+<span class="material-symbols-outlined text-white text-4xl opacity-80 group-hover/video:scale-110 transition-transform drop-shadow-lg">play_circle</span>
+</div>
+</div>
+<button class="mt-auto w-full bg-white border-2 border-primary text-primary font-bold py-3 rounded-xl hover:bg-orange-50 transition-all flex justify-center items-center gap-2">
+<span>このスタイルを使う</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<div class="my-16 border-t border-dashed border-border-main"></div>
+<section class="space-y-6" id="url">
+<h2 class="text-xl font-bold text-text-main flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">link</span>
+                URLからスタイルを学習
+            </h2>
+<div class="bg-white rounded-2xl p-8 border border-border-main shadow-card">
+<div class="max-w-3xl mx-auto space-y-6">
+<div class="text-center space-y-2">
+<h3 class="text-lg font-bold">動画の雰囲気をAIがコピーします</h3>
+<p class="text-text-sub text-sm">参考にしたいYouTube動画のURLを入力してください。カットのテンポ、テロップのフォント、BGMの雰囲気を解析します。</p>
+</div>
+<div class="flex flex-col sm:flex-row gap-3">
+<div class="flex-1 relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 group-focus-within:text-primary transition-colors">link</span>
+</div>
+<input class="block w-full pl-11 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none" placeholder="https://www.youtube.com/watch?v=..." type="text"/>
+</div>
+<button class="bg-text-main text-white px-8 py-4 rounded-xl font-bold hover:bg-primary transition-colors shadow-lg flex items-center justify-center gap-2 min-w-[160px] group">
+<span class="material-symbols-outlined group-hover:animate-pulse">auto_fix_high</span>
+                            分析開始
+                        </button>
+</div>
+</div>
+</div>
+<div class="mt-8">
+<h3 class="text-sm font-bold text-text-sub mb-4 uppercase tracking-wider">最近分析した動画</h3>
+<div class="flex flex-col gap-3">
+<div class="bg-white p-3 rounded-xl border border-border-main flex items-center gap-4 hover:bg-orange-50 hover:border-orange-200 transition-colors group cursor-pointer">
+<div class="w-32 aspect-video bg-gray-200 rounded-lg overflow-hidden relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Thumbnail of a cooking tutorial video" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC29wykIpdfUopJnAWfqWk1ZGw7iAVhBLt2vDMUKgxJ44T2Eleu_r64wcDMoktFXkNu8Cf4dHhE0poJcAfIT52LbN_-SU6an-VAG1j5z6UDq4jfuBEbz1kx5cPu0N0-QK5jupdiz0O0wCM90ujRQzRZvSHPKPRVuyEhUD_-dEO1-29m4tj8VL_Ajs_dYOTnylUROdqrbv1YDecofOAmLNSh21V4B5GQmO9I3uEwZ6PvpIYeYfhki_Te4IIkAKNBj8-Wc9X2QQoMvNr3');"></div>
+</div>
+<div class="flex-1">
+<h4 class="font-bold text-text-main text-sm line-clamp-1 group-hover:text-primary transition-colors">【時短】10分で作れる絶品パスタの作り方</h4>
+<p class="text-xs text-text-sub mt-1">2023/10/25 分析済み</p>
+</div>
+<button class="bg-orange-100 text-orange-700 hover:bg-primary hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all opacity-0 group-hover:opacity-100 shadow-sm">
+                            再利用
+                        </button>
+</div>
+<div class="bg-white p-3 rounded-xl border border-border-main flex items-center gap-4 hover:bg-orange-50 hover:border-orange-200 transition-colors group cursor-pointer">
+<div class="w-32 aspect-video bg-gray-200 rounded-lg overflow-hidden relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Thumbnail of a tech review video" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDv-4rcDRD7r0Q-STMGtDVAQhPSpSlo_pKbIVkuom52o3jln7vFYHXbh7PBDpjiz2tRWyYPguxOf4WccEebGzzCHHZCzd7zA0VO9IJqMsN90T62yw3NcoiLVPwjONwG3W6bLx9fekFhbjJ7KfrP_jbEUGAhcGA436BMeyRp6tQMUehh3oIiZxd5KbrZ9ijI1lcOdFBDTagpe41joFAWB1eO3yF2VR-_8vKJNS7LUR6vB_cHKfKfjVLNlidnVaQiYLXz95BH5MgvMRHU');"></div>
+</div>
+<div class="flex-1">
+<h4 class="font-bold text-text-main text-sm line-clamp-1 group-hover:text-primary transition-colors">最新ガジェット徹底レビュー！買ってよかったものBEST5</h4>
+<p class="text-xs text-text-sub mt-1">2023/10/22 分析済み</p>
+</div>
+<button class="bg-orange-100 text-orange-700 hover:bg-primary hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all opacity-0 group-hover:opacity-100 shadow-sm">
+                            再利用
+                        </button>
+</div>
+</div>
+</div>
+</section>
+<div class="my-16 border-t border-dashed border-border-main"></div>
+<section class="space-y-6 pb-12" id="pro">
+<div class="flex justify-between items-end">
+<h2 class="text-xl font-bold text-text-main flex items-center gap-2">
+<span class="material-symbols-outlined text-orange-500">star</span>
+<span class="bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent">マイスタイル PRO</span>
+</h2>
+<button class="text-primary text-sm font-medium hover:text-orange-700 hover:underline flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-sm">settings</span>
+                    スタイル管理
+                </button>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<button class="border-2 border-dashed border-orange-200 bg-orange-50/50 rounded-xl flex flex-col items-center justify-center p-8 gap-3 hover:border-primary hover:bg-orange-50 transition-all duration-300 group h-full min-h-[200px]">
+<div class="w-14 h-14 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:scale-110 group-hover:shadow-md transition-all">
+<span class="material-symbols-outlined text-3xl text-orange-300 group-hover:text-primary transition-colors">add</span>
+</div>
+<span class="text-sm font-bold text-text-main group-hover:text-primary transition-colors">新しいスタイルを作成</span>
+</button>
+<div class="bg-white rounded-xl border border-border-main p-5 flex flex-col gap-3 relative group hover:shadow-lg hover:border-orange-200 transition-all duration-300">
+<div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+<button class="p-1.5 bg-white rounded-full shadow-sm border border-gray-100 text-text-sub hover:text-primary hover:border-primary/30 transition-colors"><span class="material-symbols-outlined text-[16px]">edit</span></button>
+<button class="p-1.5 bg-white rounded-full shadow-sm border border-gray-100 text-text-sub hover:text-red-500 hover:border-red-200 transition-colors"><span class="material-symbols-outlined text-[16px]">delete</span></button>
+</div>
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 text-orange-600 flex items-center justify-center shadow-inner mb-1">
+<span class="material-symbols-outlined">rocket_launch</span>
+</div>
+<div>
+<h3 class="font-bold text-text-main group-hover:text-primary transition-colors">製品紹介用 A</h3>
+<p class="text-xs text-text-sub mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                            最終更新: 3時間前
+                        </p>
+</div>
+<div class="mt-auto pt-3 border-t border-dashed border-gray-100">
+<div class="text-[10px] text-text-sub bg-gray-50 p-2 rounded-lg line-clamp-2 leading-relaxed">
+                            青基調、角ゴシック、BGM音量-10dB、フェードイン0.5s
+                        </div>
+</div>
+</div>
+<div class="bg-white rounded-xl border border-border-main p-5 flex flex-col gap-3 relative group hover:shadow-lg hover:border-orange-200 transition-all duration-300">
+<div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+<button class="p-1.5 bg-white rounded-full shadow-sm border border-gray-100 text-text-sub hover:text-primary hover:border-primary/30 transition-colors"><span class="material-symbols-outlined text-[16px]">edit</span></button>
+<button class="p-1.5 bg-white rounded-full shadow-sm border border-gray-100 text-text-sub hover:text-red-500 hover:border-red-200 transition-colors"><span class="material-symbols-outlined text-[16px]">delete</span></button>
+</div>
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-100 to-pink-50 text-pink-600 flex items-center justify-center shadow-inner mb-1">
+<span class="material-symbols-outlined">pets</span>
+</div>
+<div>
+<h3 class="font-bold text-text-main group-hover:text-primary transition-colors">猫チャンネル用</h3>
+<p class="text-xs text-text-sub mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                            最終更新: 2日前
+                        </p>
+</div>
+<div class="mt-auto pt-3 border-t border-dashed border-gray-100">
+<div class="text-[10px] text-text-sub bg-gray-50 p-2 rounded-lg line-clamp-2 leading-relaxed">
+                            丸文字、パステルカラー、効果音多め、カットゆっくり
+                        </div>
+</div>
+</div>
+</div>
+</section>
+</main>
+
+</body></html>

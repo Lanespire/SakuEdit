@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html class="dark" lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SakuEdit - 結果 + 簡易編集画面</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f97415",
+                        "background-light": "#f8f7f5",
+                        "background-dark": "#23170f",
+                        "panel-dark": "#2c1e16",
+                        "panel-lighter": "#3a2a20",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "Noto Sans JP", "sans-serif"],
+                        "body": ["Inter", "Noto Sans JP", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>.scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .timeline-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+        .timeline-scroll::-webkit-scrollbar-track {
+            background: #23170f;
+        }
+        .timeline-scroll::-webkit-scrollbar-thumb {
+            background: #4a3221;
+            border-radius: 4px;
+        }
+        .timeline-scroll::-webkit-scrollbar-thumb:hover {
+            background: #5c402b;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-hidden flex flex-col h-screen selection:bg-primary/30">
+<header class="flex shrink-0 items-center justify-between whitespace-nowrap border-b border-solid border-b-[#4a3221] px-6 py-3 bg-[#231810] z-20">
+<div class="flex items-center gap-4 text-white">
+<div class="flex items-center gap-3">
+<div class="size-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">movie_edit</span>
+</div>
+<div>
+<h2 class="text-white text-lg font-bold leading-tight tracking-tight">SakuEdit</h2>
+</div>
+</div>
+<div class="h-6 w-[1px] bg-white/10 mx-2"></div>
+<div class="flex flex-col justify-center">
+<div class="flex items-center gap-2 group cursor-pointer hover:bg-white/5 px-2 py-0.5 rounded -ml-2 transition-colors">
+<p class="text-sm text-white/90 font-medium">vlog_tokyo_trip_01.mp4</p>
+<span class="material-symbols-outlined text-white/50 text-sm group-hover:text-white">edit</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-5">
+<button class="flex items-center gap-2 text-sm font-medium text-white/60 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[20px]">folder_open</span>
+<span class="hidden md:inline">マイプロジェクト</span>
+</button>
+<div class="h-4 w-[1px] bg-white/10"></div>
+<div class="flex items-center gap-2 text-xs text-white/50 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
+<span class="material-symbols-outlined text-sm">cloud_done</span>
+<span>保存済み</span>
+</div>
+<button class="relative group outline-none">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-9 ring-2 ring-white/10 hover:ring-primary/50 transition-all" data-alt="User profile picture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBYEjE-44c3yZ6B9dtkZka_oK0wRo64oA3qbCjD_vfCcWfb-1OCbh8MRMxIEorl8XudPmPdRdejLR13pe3oTarKzZl8D9QkMDQ5G8l0vdiZEIU534LADnrnMUa1Jlm95PfElKULvc_P_CfiRoPJ6A_kjqgJamB3fLj5XSd9dE7aGC-vGzs_MCGmsVVzzo73Wfy6SKWm-0dCamR5B6XkV9FJ1SHF9-rQ3cXXZs7DUkboOx680QzfoiGoyyubCiZELH7feO2NGcKOnSbT");'></div>
+<div class="absolute right-0 top-0 size-3 bg-green-500 border-2 border-[#231810] rounded-full"></div>
+</button>
+</div>
+</header>
+<main class="flex-1 flex flex-col overflow-hidden relative">
+<div class="flex-shrink-0 bg-[#1a110a] py-6 px-4 flex justify-center border-b border-[#4a3221]">
+<div class="relative w-full max-w-[900px] aspect-video bg-black rounded-xl overflow-hidden shadow-2xl group">
+<div class="absolute inset-0 bg-cover bg-center opacity-80" data-alt="Video preview frame showing a cityscape" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDjGvxu495JEZ63VXBOqZq05RGCYqBYlcAGgi_yikyrVunGG0logcN478IX_srVmV2ODfl3gMlsRvoPUq2Mof8AZC08_7Ge3-xj6v8iUWE_VK4c3DcCD3T0NMu1XQhsEOV699mDXKGp5NntevdBtxgI2IypDWwGC1AVumUa4n0os4mcu-HNeLH0dMYKezjz5clY6cKhrs3nRMfDN8JixKV4GGXmzgnjxt_ePfjOCGL0Xj7_8-qfMUSvS_-A9u0UDVhtjuEGijTSStmQ");'></div>
+<div class="absolute top-4 right-4 z-10 cursor-pointer hover:scale-105 transition-transform">
+<div class="flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-full bg-primary/90 backdrop-blur-sm pl-3 pr-4 shadow-lg border border-white/10">
+<span class="material-symbols-outlined text-white text-[18px]">auto_awesome</span>
+<p class="text-white text-xs font-bold leading-normal">YouTuber風スタイル適用中</p>
+</div>
+</div>
+<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<button class="flex items-center justify-center rounded-full size-16 bg-black/60 text-white backdrop-blur-sm hover:bg-primary hover:scale-110 transition-all">
+<span class="material-symbols-outlined text-4xl ml-1">play_arrow</span>
+</button>
+</div>
+<div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent pt-12 pb-4 px-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<div class="flex h-4 items-center justify-center cursor-pointer group/scrubber">
+<div class="h-1 flex-1 rounded-full bg-white/30 overflow-hidden relative">
+<div class="absolute h-full w-[37%] bg-primary rounded-full"></div>
+</div>
+<div class="relative ml-[-6px]"><div class="size-3 rounded-full bg-white shadow-md scale-0 group-hover/scrubber:scale-100 transition-transform"></div></div>
+</div>
+<div class="flex items-center justify-between mt-2">
+<div class="flex items-center gap-4">
+<button class="text-white hover:text-primary transition-colors"><span class="material-symbols-outlined">play_arrow</span></button>
+<button class="text-white hover:text-primary transition-colors"><span class="material-symbols-outlined">volume_up</span></button>
+<div class="text-white text-xs font-medium tracking-wide font-mono">
+<span class="text-white">1:23</span>
+<span class="text-white/50 mx-1">/</span>
+<span class="text-white/50">3:45</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-white hover:text-primary transition-colors"><span class="material-symbols-outlined">settings</span></button>
+<button class="text-white hover:text-primary transition-colors"><span class="material-symbols-outlined">fullscreen</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col bg-panel-dark min-h-[300px] border-b border-[#4a3221]">
+<div class="flex items-center justify-between px-4 py-2 bg-[#231810] border-b border-[#4a3221]">
+<h3 class="text-white text-sm font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">view_timeline</span>
+                    タイムライン
+                </h3>
+<div class="flex items-center gap-3">
+<div class="flex items-center bg-white/5 rounded-lg p-1">
+<button class="p-1 hover:bg-white/10 rounded text-white/70 hover:text-white"><span class="material-symbols-outlined text-[18px]">remove</span></button>
+<div class="w-20 h-1 bg-white/10 rounded-full mx-2 overflow-hidden">
+<div class="w-1/2 h-full bg-white/40"></div>
+</div>
+<button class="p-1 hover:bg-white/10 rounded text-white/70 hover:text-white"><span class="material-symbols-outlined text-[18px]">add</span></button>
+</div>
+<button class="text-xs font-medium text-white/70 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors">
+                        全体を表示
+                    </button>
+</div>
+</div>
+<div class="flex-1 overflow-x-auto overflow-y-hidden timeline-scroll relative flex flex-col">
+<div class="h-8 min-w-[1200px] bg-[#231810] border-b border-white/5 flex items-end text-[10px] text-white/40 font-mono select-none sticky top-0 z-10">
+<div class="flex w-full px-20"> 
+<div class="flex-1 border-l border-white/10 pl-1">0:00</div>
+<div class="flex-1 border-l border-white/10 pl-1">0:15</div>
+<div class="flex-1 border-l border-white/10 pl-1">0:30</div>
+<div class="flex-1 border-l border-white/10 pl-1">0:45</div>
+<div class="flex-1 border-l border-white/10 pl-1">1:00</div>
+<div class="flex-1 border-l border-white/10 pl-1">1:15</div>
+<div class="flex-1 border-l border-white/10 pl-1">1:30</div>
+<div class="flex-1 border-l border-white/10 pl-1">1:45</div>
+</div>
+</div>
+<div class="absolute top-0 bottom-0 left-[340px] w-[2px] bg-primary z-30 pointer-events-none">
+<div class="absolute -top-0 -left-[5px] w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary"></div>
+</div>
+<div class="h-8 min-w-[1200px] flex items-center bg-[#231810]/50 border-b border-white/5 relative group">
+<div class="sticky left-0 w-24 bg-[#231810] h-full flex items-center justify-end pr-3 border-r border-white/10 z-20 shadow-[4px_0_10px_rgba(0,0,0,0.3)]">
+<span class="text-[10px] text-white/50 font-medium tracking-wider">MARKERS</span>
+</div>
+<div class="flex-1 relative h-full">
+<div class="absolute left-[200px] top-1/2 -translate-y-1/2 size-2 bg-yellow-500 rotate-45" title="Scene Change"></div>
+<div class="absolute left-[650px] top-1/2 -translate-y-1/2 size-2 bg-blue-500 rotate-45" title="Cut Point"></div>
+</div>
+</div>
+<div class="h-16 min-w-[1200px] flex items-center bg-panel-dark border-b border-white/5 relative group py-1">
+<div class="sticky left-0 w-24 bg-panel-dark h-full flex flex-col items-center justify-center gap-1 border-r border-white/10 z-20 shadow-[4px_0_10px_rgba(0,0,0,0.3)]">
+<span class="material-symbols-outlined text-white/60 text-lg">movie</span>
+<span class="text-[10px] text-white/50">動画</span>
+</div>
+<div class="flex-1 relative h-full flex items-center px-4">
+<div class="h-12 w-[280px] bg-blue-600/30 border border-blue-500/50 rounded-lg flex items-center justify-center overflow-hidden relative group/clip cursor-pointer hover:bg-blue-600/40 transition-colors">
+<div class="absolute inset-0 flex gap-[2px] opacity-30">
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAvX5yeyO96el8Jvz-uOG2wVVg_UDqwqPlLYvXlttzerKCkpoJRX2i21FJjUrPlAhd49QsuI9JYHveUDRAE2kTDUcxX92I_I7BiNq48LkshEq5TU9SsxeD_80WKMgccYw8ZaUdaxgpfSA2g78sSidkF_-dfaVcBWyuatrSao_wFXZO2CimPpkqF_9Ly5gF90S0CJez16fPOlCOhhfXhHFLCWYra5LztUnZbF6N5ikrSIssiHNsGiUpsl5ucqRiLdQbzClAo0c70_ZKb")'></div>
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCYOGDuMdRg3WpUGTwcTZmPTu8NkHLIpg5Hhyc2aCQUOSWK8BgS8V2gPnGbUTZ4OXjHWRnjkwpftVmyEtuz6O0-l4Tl6cGq8ZdYAo6lniht5hNxXNInNjekkHf47RKknfNiHbHt9WJ8zUYzHchj7M6vpQAN8cN5WWeb4VlKFLu8smD6kUJ_Wq2h-3V9MIdTHcR46RvV24tI4Pm402eEiwutzbSlc99-9tcKnhKQtkHyIZ0ytR1GrqYfNnZ9fnGvlCmDKPNcpQDPuDAa")'></div>
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCOBtnzlzvFcSZMR2tIVfXbPlt5KOzDYKfq_PAOM720ocOjNUtdULiSi4_N79Iweh3aL2D5gtBsDrkbhes2Zv-CevWGvWdH2iS7LFjAh_8pReCyaqdHHjslM5AphbieC0x9w5wE1IhCFE-OXNo1Gq9UOUm_rLqluvYF18HYrVqTDsTccxo7P2E-qlXQsJ7Vu0CJSdsG_qO8pJQOEKoojd3oxyzWHx_BaXD4e7JRt9Uk-Uc82QL-6jnMjhaIvxS2Y48lVssnUi2Fe48r")'></div>
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCLMEAGDPKfmcjHaA6nhaPQyl8hmGC5ezCktkSBp23XD96BHlFbC_Yo45sVxL2TUb3R8MwSSH-h4XoIs293Tr9hQCIDFI3geRJms5jgJJG8k_Zf9cEZ-RLHli9f9MNy1p8pO7bM6J9uPHvWvkkozqHCLOqw90nRk8WrNSFHj1DFHMM5jrxcojwAxRL56igicow_JBExsnYQE5e2lrrno9PQBykKfn7KYQeN4FmeSHNHV95uN6nO8YX6VAQjhxCB1UD_u1RqTZWaoaOv")'></div>
+</div>
+<span class="text-[10px] text-blue-100 font-medium relative z-10 truncate px-2">IMG_4921.MOV</span>
+<div class="absolute left-0 w-2 h-full bg-blue-400 cursor-w-resize opacity-0 group-hover/clip:opacity-100"></div>
+<div class="absolute right-0 w-2 h-full bg-blue-400 cursor-e-resize opacity-0 group-hover/clip:opacity-100"></div>
+</div>
+<div class="w-6 h-full flex items-center justify-center">
+<div class="h-full w-[1px] border-l border-dashed border-white/20"></div>
+</div>
+<div class="h-12 w-[450px] bg-blue-600/30 border border-blue-500/50 rounded-lg flex items-center justify-center overflow-hidden relative group/clip cursor-pointer hover:bg-blue-600/40 transition-colors">
+<div class="absolute inset-0 flex gap-[2px] opacity-30">
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC7clSCyAR-OFa4-bEZbj8hZdJIHisgdn6cu5Pe2X7Y-x7NzQiURdUF9xqHCN7PgtAitgeJzneTLK8vYJf4rhjVoagsM3NNeh3VrHL8bK19EihOwp5SZ4xn_1WFHjL1v8s5xKgSc1grFbXbznno7x8JjEGU45y-QQJjyYxESPsXbnxNQqGb37QuWhs7P90LW5eC2QxLpmkV_vfqsX4kcmr0VEQlNErgULWbJsh2u1XIjVeO_MAIEa23shu7R9KqJ9YhtPEiGeiiQEkN")'></div>
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA-tH9a-O77gKvuf3r7PxpVMgvumx2xuc5LmwGVRJ9Yld5V0jlxN17VwjH9mvyP4Q9ccxxi5SmhfmpXQsOYeHmF1OrarqU__CVtUoKwUseN5mS45SVXmCH3xDCL97lPcrLtaeIbanHEPWnAMwjURO9iHAlllmNJKchjawovByMMHSglFRqOnDJRsnAM3WyUf18U6ICEu5uYLQNyHYpoBmyWJo_xY7sjRZ99aC0bACub5uz_7oAKYemvtVvEj-o6U2mQAWNhqMq7HqyC")'></div>
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA_HnsS1H3zQdpCQRcj6Av50Hjw2SkFy60Gjl8M8nDI0Y0E37Kt7f_zln6BORs6aFro7Sc1Eha2aqrrzidvG67FGSA21icZPagVhs9HgmF-wsylvKETuGXpEByT4snezMS-QG9OLEe7TdFOc1P4Ruvh8DBa2J9Ppl_0G4Fs8Fg_cCk890h-V6MrBbSUhTj1bJQQQZHfJjvnI9sRmi2NTIiPHykRe-D_P0F-dDuluTlIEXV6mtA5rDwzD0zbksZo0JYyU0GJ8WAp6Szt")'></div>
+<div class="h-full w-8 bg-cover" data-alt="thumbnail" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA4eInaBq3XGpYbGfjJUHTwJ7mudaWxfPJzrUr1iE5xBjE-TTxHOQNnZ3UyECMLLArZ36swkBg7O-YUHQKGZeAbNdgz5Qx9dgauCfeLCNIGyCd9D75lk8KKaeyh6XS9AYkU4zFmK1HRGgPKOTbglivulwGm7oHD1OPeuCixgdTrnYrUvXQmid9aXgYEQZm63f2sVIQvvLpwsAe5HnNUJcvFbWBJNwbCEZw987l58vYX31k1zahW4JHRvko4u64ZZftvpTsWfDjl2Xij")'></div>
+</div>
+<span class="text-[10px] text-blue-100 font-medium relative z-10 truncate px-2">IMG_4922.MOV</span>
+</div>
+</div>
+</div>
+<div class="h-12 min-w-[1200px] flex items-center bg-panel-dark border-b border-white/5 relative group">
+<div class="sticky left-0 w-24 bg-panel-dark h-full flex flex-col items-center justify-center gap-1 border-r border-white/10 z-20 shadow-[4px_0_10px_rgba(0,0,0,0.3)]">
+<span class="material-symbols-outlined text-white/60 text-lg">subtitles</span>
+<span class="text-[10px] text-white/50">字幕</span>
+</div>
+<div class="flex-1 relative h-full flex items-center px-4">
+<div class="h-8 w-[120px] ml-[20px] bg-purple-500/20 border border-purple-500/50 rounded flex items-center px-2 cursor-pointer hover:bg-purple-500/30">
+<span class="text-[10px] text-purple-200 truncate">こんにちは、みなさん</span>
+</div>
+<div class="h-8 w-[160px] ml-[40px] bg-primary/20 border border-primary/50 rounded flex items-center px-2 cursor-pointer hover:bg-primary/30 shadow-[0_0_10px_rgba(249,116,21,0.1)]">
+<span class="text-[10px] text-orange-200 truncate font-bold">今回の旅行はマジで最高！</span>
+</div>
+<div class="h-8 w-[100px] ml-[60px] bg-purple-500/20 border border-purple-500/50 rounded flex items-center px-2 cursor-pointer hover:bg-purple-500/30">
+<span class="text-[10px] text-purple-200 truncate">場所はこちら...</span>
+</div>
+</div>
+</div>
+<div class="h-14 min-w-[1200px] flex items-center bg-panel-dark border-b border-white/5 relative group">
+<div class="sticky left-0 w-24 bg-panel-dark h-full flex flex-col items-center justify-center gap-1 border-r border-white/10 z-20 shadow-[4px_0_10px_rgba(0,0,0,0.3)]">
+<span class="material-symbols-outlined text-white/60 text-lg">graphic_eq</span>
+<span class="text-[10px] text-white/50">音声</span>
+</div>
+<div class="flex-1 relative h-full flex items-center px-4 py-1">
+<div class="absolute inset-0 ml-4 h-full opacity-30 flex items-center" style="background-image: linear-gradient(90deg, transparent 0%, transparent 100%);">
+<div class="w-full h-[60%] flex items-center gap-[1px]">
+<div class="w-1 h-[40%] bg-emerald-500 rounded-full"></div>
+<div class="w-1 h-[60%] bg-emerald-500 rounded-full"></div>
+<div class="w-1 h-[90%] bg-emerald-500 rounded-full"></div>
+<div class="w-1 h-[30%] bg-emerald-500 rounded-full"></div>
+<div class="w-1 h-[10%] bg-red-500/50 rounded-full" title="Silence"></div> 
+<div class="w-1 h-[10%] bg-red-500/50 rounded-full" title="Silence"></div>
+<div class="w-1 h-[50%] bg-emerald-500 rounded-full"></div>
+<div class="w-1 h-[80%] bg-emerald-500 rounded-full"></div>
+<div class="w-full h-8 bg-repeat-x opacity-40" style="background-image: url('data:image/svg+xml;utf8,&lt;svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'20\' viewBox=\'0 0 10 20\'&gt;&lt;rect x=\'0\' y=\'5\' width=\'2\' height=\'10\' fill=\'%2310b981\'/&gt;&lt;/svg&gt;');"></div>
+</div>
+</div>
+<div class="absolute left-[300px] w-[60px] h-[80%] bg-black/50 border border-white/10 flex items-center justify-center rounded z-10 backdrop-blur-[1px]">
+<span class="material-symbols-outlined text-white/30 text-xs">mic_off</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex-1 bg-[#1a110a] flex flex-col min-h-0">
+<div class="flex items-center px-4 border-b border-[#4a3221] bg-[#231810]">
+<button class="flex items-center gap-2 px-6 py-4 border-b-2 border-primary text-primary font-bold text-sm bg-primary/5">
+<span class="material-symbols-outlined text-[20px]">auto_fix_high</span>
+                    AI提案
+                </button>
+<button class="flex items-center gap-2 px-6 py-4 border-b-2 border-transparent text-white/60 hover:text-white font-medium text-sm transition-colors">
+<span class="material-symbols-outlined text-[20px]">subtitles</span>
+                    字幕
+                </button>
+<button class="flex items-center gap-2 px-6 py-4 border-b-2 border-transparent text-white/60 hover:text-white font-medium text-sm transition-colors">
+<span class="material-symbols-outlined text-[20px]">content_cut</span>
+                    カット
+                </button>
+<button class="flex items-center gap-2 px-6 py-4 border-b-2 border-transparent text-white/60 hover:text-white font-medium text-sm transition-colors">
+<span class="material-symbols-outlined text-[20px]">palette</span>
+                    スタイル
+                </button>
+</div>
+<div class="flex-1 p-6 overflow-y-auto pb-24">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-[1200px] mx-auto">
+<div class="bg-panel-lighter border border-white/5 rounded-xl p-5 hover:border-primary/30 transition-colors group">
+<div class="flex justify-between items-start mb-3">
+<div class="size-10 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center">
+<span class="material-symbols-outlined">content_cut</span>
+</div>
+<span class="text-[10px] font-bold bg-primary/20 text-primary px-2 py-1 rounded">推奨</span>
+</div>
+<h4 class="text-white font-bold mb-1">無音カット</h4>
+<p class="text-white/60 text-sm mb-4">8箇所の無音エリアを検出しました。適用すると動画全体を <span class="text-white font-bold">32秒</span> 短縮できます。</p>
+<div class="flex gap-2 mt-auto">
+<button class="flex-1 bg-primary text-white text-sm font-bold py-2 rounded-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">全て適用</button>
+<button class="px-3 bg-white/5 text-white/70 hover:text-white rounded-lg border border-white/10 hover:bg-white/10 transition-colors" title="プレビュー">
+<span class="material-symbols-outlined text-[20px]">play_circle</span>
+</button>
+</div>
+</div>
+<div class="bg-panel-lighter border border-white/5 rounded-xl p-5 hover:border-primary/30 transition-colors">
+<div class="flex justify-between items-start mb-3">
+<div class="size-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+<span class="material-symbols-outlined">speed</span>
+</div>
+</div>
+<h4 class="text-white font-bold mb-1">テンポ最適化</h4>
+<p class="text-white/60 text-sm mb-4">YouTuber風のテンポに合わせて、間延びしたシーンを自動調整します。</p>
+<div class="flex gap-2 mt-auto">
+<button class="flex-1 bg-white/10 text-white text-sm font-bold py-2 rounded-lg hover:bg-white/20 border border-white/10 transition-colors">適用</button>
+<button class="px-4 text-white/50 hover:text-white text-sm font-medium transition-colors">調整...</button>
+</div>
+</div>
+<div class="bg-panel-lighter border border-white/5 rounded-xl p-5 hover:border-primary/30 transition-colors">
+<div class="flex justify-between items-start mb-3">
+<div class="size-10 rounded-lg bg-yellow-500/20 text-yellow-400 flex items-center justify-center">
+<span class="material-symbols-outlined">star</span>
+</div>
+</div>
+<h4 class="text-white font-bold mb-1">ハイライト検出</h4>
+<p class="text-white/60 text-sm mb-4">音声の盛り上がりから、3箇所の重要なポイントを検出しました。</p>
+<div class="flex gap-2 mt-auto">
+<button class="flex-1 bg-white/10 text-white text-sm font-bold py-2 rounded-lg hover:bg-white/20 border border-white/10 transition-colors">マーカー追加</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[800px] px-4">
+<div class="bg-[#2c1e16]/90 backdrop-blur-md border border-white/10 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-2 flex items-center justify-between">
+<div class="flex items-center gap-1 pl-2">
+<button class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors" title="元に戻す">
+<span class="material-symbols-outlined">undo</span>
+</button>
+<button class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors" title="やり直し">
+<span class="material-symbols-outlined">redo</span>
+</button>
+<div class="w-[1px] h-6 bg-white/10 mx-1"></div>
+<span class="text-xs text-white/40 ml-1">自動保存: 2分前</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 text-sm font-medium text-white hover:bg-white/5 rounded-lg border border-transparent hover:border-white/10 transition-colors">
+                    下書き保存
+                </button>
+<div class="relative group">
+<button class="flex items-center gap-2 pl-4 pr-3 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-bold rounded-lg shadow-lg shadow-primary/20 transition-all">
+                        書き出し
+                        <span class="w-[1px] h-4 bg-white/30"></span>
+<span class="material-symbols-outlined text-[18px]">expand_more</span>
+</button>
+<div class="absolute bottom-full right-0 mb-2 w-48 bg-[#2c1e16] border border-white/10 rounded-xl shadow-xl overflow-hidden invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all transform origin-bottom-right scale-95 group-hover:scale-100">
+<div class="p-1">
+<button class="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/5 rounded-lg flex items-center justify-between">
+<span>720p HD</span>
+</button>
+<button class="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/5 rounded-lg flex items-center justify-between">
+<span>1080p FHD</span>
+<span class="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">PRO</span>
+</button>
+<button class="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/5 rounded-lg flex items-center justify-between">
+<span>4K Ultra HD</span>
+<span class="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">PRO</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>

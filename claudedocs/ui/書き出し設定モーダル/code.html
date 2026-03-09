@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>書き出し設定 - Patto Edit</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f97415",
+                        "primary-hover": "#e0650f",
+                        "background-light": "#f8f7f5",
+                        "background-dark": "#23170f",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#2d241f",
+                        "border-light": "#e9d9ce",
+                        "border-dark": "#4a3b32",
+                        "text-main": "#1c130d",
+                        "text-sub": "#9e6b47",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "Noto Sans JP", "sans-serif"],
+                        "body": ["Inter", "Noto Sans JP", "sans-serif"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        'modal': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark min-h-screen text-text-main dark:text-white overflow-hidden">
+<!-- Background (Simulating the app behind the modal) -->
+<div class="fixed inset-0 z-0 opacity-20 pointer-events-none" data-alt="Abstract dotted pattern background" style="background-image: radial-gradient(#9e6b47 1px, transparent 1px); background-size: 24px 24px;">
+</div>
+<!-- Modal Overlay -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
+<!-- Modal Container -->
+<div class="relative w-full max-w-[500px] bg-surface-light dark:bg-surface-dark rounded-xl shadow-modal flex flex-col max-h-[90vh] overflow-hidden transition-all">
+<!-- Header -->
+<div class="flex items-center justify-between px-6 py-4 border-b border-border-light dark:border-border-dark shrink-0">
+<h2 class="text-xl font-bold tracking-tight text-text-main dark:text-white flex items-center gap-2">
+<span class="text-2xl">📤</span> 書き出し設定
+                </h2>
+<button class="text-text-sub hover:text-text-main dark:text-gray-400 dark:hover:text-white transition-colors p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Scrollable Content -->
+<div class="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-thin scrollbar-thumb-border-light dark:scrollbar-thumb-border-dark">
+<!-- Quality Section -->
+<div class="space-y-3">
+<h3 class="text-sm font-semibold text-text-main dark:text-gray-200">解像度</h3>
+<div class="flex flex-col gap-3">
+<!-- 720p Option -->
+<label class="relative flex items-center p-4 border rounded-lg cursor-pointer transition-all hover:bg-background-light dark:hover:bg-white/5 border-border-light dark:border-border-dark group">
+<input class="peer sr-only" name="quality" type="radio" value="720p"/>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-bold text-text-main dark:text-white">720p HD</span>
+<span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 rounded-full">無料プラン</span>
+</div>
+<p class="text-xs text-text-sub dark:text-gray-400">予想サイズ: ~45MB</p>
+</div>
+<div class="w-5 h-5 rounded-full border-2 border-border-light dark:border-gray-600 peer-checked:border-primary peer-checked:bg-primary transition-colors flex items-center justify-center">
+<div class="w-2.5 h-2.5 bg-white rounded-full opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+<!-- Ring for focus/checked state styling on parent -->
+<div class="absolute inset-0 rounded-lg border-2 border-transparent peer-checked:border-primary pointer-events-none"></div>
+</label>
+<!-- 1080p Option (Selected) -->
+<label class="relative flex items-center p-4 border rounded-lg cursor-pointer transition-all bg-primary/5 dark:bg-primary/10 border-primary group">
+<input checked="" class="peer sr-only" name="quality" type="radio" value="1080p"/>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-bold text-text-main dark:text-white">1080p Full HD</span>
+<span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white bg-primary rounded-full shadow-sm">PRO</span>
+<span class="px-2 py-0.5 text-[10px] font-bold text-primary bg-white dark:bg-black/20 border border-primary/20 rounded-full">推奨</span>
+</div>
+<p class="text-xs text-text-sub dark:text-gray-400">予想サイズ: ~120MB</p>
+</div>
+<div class="w-5 h-5 rounded-full border-2 border-primary bg-primary transition-colors flex items-center justify-center">
+<div class="w-2.5 h-2.5 bg-white rounded-full"></div>
+</div>
+<div class="absolute inset-0 rounded-lg border-2 border-primary pointer-events-none"></div>
+</label>
+<!-- 4K Option -->
+<label class="relative flex items-center p-4 border rounded-lg cursor-pointer transition-all hover:bg-background-light dark:hover:bg-white/5 border-border-light dark:border-border-dark group">
+<input class="peer sr-only" name="quality" type="radio" value="4k"/>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="font-bold text-text-main dark:text-white">4K Ultra HD</span>
+<span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white bg-gray-800 dark:bg-gray-600 rounded-full">PRO</span>
+</div>
+<p class="text-xs text-text-sub dark:text-gray-400">予想サイズ: ~400MB</p>
+</div>
+<div class="w-5 h-5 rounded-full border-2 border-border-light dark:border-gray-600 peer-checked:border-primary peer-checked:bg-primary transition-colors flex items-center justify-center">
+<div class="w-2.5 h-2.5 bg-white rounded-full opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+<div class="absolute inset-0 rounded-lg border-2 border-transparent peer-checked:border-primary pointer-events-none"></div>
+</label>
+</div>
+</div>
+<!-- Format & Subtitles Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Format -->
+<div class="space-y-2">
+<label class="block text-sm font-semibold text-text-main dark:text-gray-200">フォーマット</label>
+<div class="relative">
+<select class="w-full h-12 px-4 bg-background-light dark:bg-black/20 border border-border-light dark:border-border-dark rounded-lg text-text-main dark:text-white appearance-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none transition-shadow cursor-pointer">
+<option selected="" value="mp4">MP4 (推奨)</option>
+<option value="webm">WebM</option>
+<option value="mov">MOV</option>
+</select>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-sub dark:text-gray-400">
+<span class="material-symbols-outlined text-xl">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Subtitles -->
+<div class="space-y-2">
+<label class="block text-sm font-semibold text-text-main dark:text-gray-200">字幕</label>
+<div class="space-y-2">
+<label class="flex items-center gap-2 cursor-pointer group">
+<input checked="" class="w-4 h-4 text-primary bg-background-light border-border-light focus:ring-primary focus:ring-offset-0 dark:bg-black/20 dark:border-gray-600 dark:checked:bg-primary" name="subtitles" type="radio"/>
+<span class="text-sm text-text-main dark:text-gray-300 group-hover:text-primary transition-colors">動画に焼き込む (ハードサブ)</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer group">
+<input class="w-4 h-4 text-primary bg-background-light border-border-light focus:ring-primary focus:ring-offset-0 dark:bg-black/20 dark:border-gray-600 dark:checked:bg-primary" name="subtitles" type="radio"/>
+<span class="text-sm text-text-main dark:text-gray-300 group-hover:text-primary transition-colors">別ファイルで出力 (SRT)</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer group">
+<input class="w-4 h-4 text-primary bg-background-light border-border-light focus:ring-primary focus:ring-offset-0 dark:bg-black/20 dark:border-gray-600 dark:checked:bg-primary" name="subtitles" type="radio"/>
+<span class="text-sm text-text-main dark:text-gray-300 group-hover:text-primary transition-colors">両方</span>
+</label>
+</div>
+</div>
+</div>
+<div class="h-px bg-border-light dark:bg-border-dark w-full"></div>
+<!-- Advanced Options -->
+<div class="space-y-4">
+<!-- Watermark -->
+<div class="flex items-start gap-3">
+<div class="flex items-center h-5">
+<input class="w-5 h-5 rounded border-2 border-border-light bg-background-light text-primary focus:ring-0 focus:ring-offset-0 dark:bg-black/20 dark:border-gray-600 dark:checked:bg-primary cursor-pointer" id="watermark" type="checkbox"/>
+</div>
+<div class="flex-1">
+<label class="text-sm font-medium text-text-main dark:text-white cursor-pointer select-none" for="watermark">
+                                ウォーターマークを削除
+                            </label>
+<p class="text-xs text-primary mt-0.5 font-medium cursor-pointer" onclick="document.getElementById('watermark').click()">PROにアップグレード <span class="material-symbols-outlined text-[10px] align-middle">open_in_new</span></p>
+</div>
+<!-- Watermark Preview Mockup -->
+<div aria-hidden="true" class="w-16 h-10 bg-gray-100 dark:bg-gray-800 rounded border border-border-light dark:border-gray-700 relative overflow-hidden">
+<div class="absolute bottom-1 right-1 px-1 py-0.5 bg-black/50 rounded text-[6px] text-white font-bold">WATERMARK</div>
+</div>
+</div>
+<!-- Thumbnail -->
+<div class="flex items-start gap-3">
+<div class="flex items-center h-5">
+<input checked="" class="w-5 h-5 rounded border-2 border-border-light bg-background-light text-primary focus:ring-0 focus:ring-offset-0 dark:bg-black/20 dark:border-gray-600 dark:checked:bg-primary cursor-pointer" id="thumbnail" type="checkbox"/>
+</div>
+<div class="flex-1">
+<label class="text-sm font-medium text-text-main dark:text-white cursor-pointer select-none" for="thumbnail">
+                                サムネイルも書き出す
+                            </label>
+<p class="text-xs text-text-sub dark:text-gray-400 mt-0.5">JPG形式で保存されます</p>
+</div>
+<!-- Thumbnail Preview -->
+<div class="relative group cursor-pointer w-24 h-[54px] rounded-lg overflow-hidden border border-border-light dark:border-gray-700">
+<!-- Using a gradient div as per instructions not to use external images unless needed, but data-alt is required -->
+<div class="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" data-alt="Video thumbnail preview with colorful gradient"></div>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="text-xs text-white font-medium border border-white/50 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm">変更</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="border-t border-border-light dark:border-border-dark p-6 bg-background-light/50 dark:bg-black/20">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-1.5 text-text-sub dark:text-gray-400">
+<span class="material-symbols-outlined text-lg">timer</span>
+<span class="text-xs font-medium">予想時間: 約2分30秒</span>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex-1 px-4 py-3 rounded-lg border-2 border-border-light dark:border-gray-600 text-text-main dark:text-white font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500">
+                        キャンセル
+                    </button>
+<button class="flex-[2] px-4 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-bold shadow-lg shadow-primary/20 transition-all transform active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-surface-dark flex items-center justify-center gap-2">
+<span>書き出しを開始</span>
+<span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</body></html>

@@ -7,14 +7,35 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report",
+    "remotion:preview": "remotion preview remotion/Root.tsx",
+    "remotion:render": "remotion render VideoComposition out/video.mp4",
+    "prisma:seed": "prisma db seed",
+    "prisma:reset": "prisma migrate reset --force"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.2",
+    "@remotion/cli": "^4.0.434",
+    "@remotion/player": "^4.0.434",
+    "better-auth": "^1.5.4",
+    "groq-sdk": "^0.37.0",
     "next": "16.1.5",
+    "next-auth": "^4.24.13",
+    "openai": "^6.27.0",
+    "prisma": "^6.19.2",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "remotion": "^4.0.434"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
