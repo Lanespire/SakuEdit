@@ -1,114 +1,161 @@
-'use client';
+'use client'
 
-import { Suspense, useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useForm, useWatch } from 'react-hook-form'
+import { z } from 'zod'
+import { postJson } from '@/lib/client/http'
+
+const presetStyles = [
+  {
+    id: 'hikakin',
+    name: 'HIKAKIN風',
+    description: 'テンション高め、カラフル字幕、早いカット',
+    thumbnail: '🎮',
+  },
+  {
+    id: 'mizutamari',
+    name: '水溜りボンド風',
+    description: 'シンプル字幕、テンポ良いカット、見やすい構成',
+    thumbnail: '🎬',
+  },
+  {
+    id: 'quizknock',
+    name: 'QuizKnock風',
+    description: '知的な構成、図解字幕、落ち着いたテンポ',
+    thumbnail: '📚',
+  },
+] as const
+
+const presetStyleIds = presetStyles.map((style) => style.id) as [
+  (typeof presetStyles)[number]['id'],
+  ...(typeof presetStyles)[number]['id'][],
+]
+
+const stylesFormSchema = z
+  .object({
+    selectedStyle: z.enum(presetStyleIds).or(z.literal('')),
+    youtubeUrl: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value.length === 0 || z.url().safeParse(value).success,
+        '有効な URL を入力してください',
+      ),
+  })
+  .refine(
+    ({ selectedStyle, youtubeUrl }) =>
+      Boolean(selectedStyle) || Boolean(youtubeUrl),
+    {
+      message: 'スタイルを選択するか、YouTube URLを入力してください',
+      path: ['youtubeUrl'],
+    },
+  )
+
+type StylesFormValues = z.infer<typeof stylesFormSchema>
 
 function StylesPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get('projectId')
-
-  const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
-  const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [isStarting, setIsStarting] = useState(false);
-  const [error, setError] = useState('');
-
-  const presetStyles = [
-    {
-      id: 'hikakin',
-      name: 'HIKAKIN風',
-      description: 'テンション高め、カラフル字幕、早いカット',
-      thumbnail: '🎮',
+  const {
+    control,
+    register,
+    setValue,
+    handleSubmit,
+    setError,
+    clearErrors,
+    formState: { errors, isSubmitting },
+  } = useForm<StylesFormValues>({
+    resolver: zodResolver(stylesFormSchema),
+    defaultValues: {
+      selectedStyle: '',
+      youtubeUrl: '',
     },
-    {
-      id: 'mizutamari',
-      name: '水溜りボンド風',
-      description: 'シンプル字幕、テンポ良いカット、見やすい構成',
-      thumbnail: '🎬',
-    },
-    {
-      id: 'quizknock',
-      name: 'QuizKnock風',
-      description: '知的な構成、図解字幕、落ち着いたテンポ',
-      thumbnail: '📚',
-    },
-  ];
+  })
 
-  const handleStartProcessing = async () => {
+  const selectedStyle = useWatch({ control, name: 'selectedStyle' })
+  const youtubeUrl = useWatch({ control, name: 'youtubeUrl' })
+
+  const onSubmit = handleSubmit(async ({ selectedStyle, youtubeUrl }) => {
     if (!projectId) {
-      setError('プロジェクトIDが見つかりません');
-      return;
+      setError('root', {
+        message: 'プロジェクトIDが見つかりません',
+      })
+      return
     }
-
-    if (!selectedStyle && !youtubeUrl) {
-      setError('スタイルを選択するか、YouTube URLを入力してください');
-      return;
-    }
-
-    setIsStarting(true);
-    setError('');
 
     try {
-      // カスタムスタイル学習の場合は分析APIを呼び出す
       if (youtubeUrl) {
-        const analyzeRes = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        await postJson<Record<string, unknown>, { projectId: string; referenceUrl: string }>(
+          '/api/analyze',
+          {
             projectId,
             referenceUrl: youtubeUrl,
-          }),
-        });
-
-        if (!analyzeRes.ok) {
-          throw new Error('スタイル分析に失敗しました');
-        }
-      }
-
-      // 処理を開始（プリセットまたは学習済みスタイルを適用）
-      const processRes = await fetch('/api/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          styleId: selectedStyle,
-          customStyleUrl: youtubeUrl,
-          options: {
-            silenceThreshold: -35,
-            silenceDuration: 0.5,
-            subtitles: [],
-            quality: '720p',
-            format: 'mp4',
-            watermark: false,
           },
-        }),
-      });
-
-      if (!processRes.ok) {
-        const errorData = await processRes.json().catch(() => ({}));
-        throw new Error(errorData.error || '処理の開始に失敗しました');
+        )
       }
 
-      // 処理中画面へ遷移
-      router.push(`/processing/${projectId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'エラーが発生しました');
-    } finally {
-      setIsStarting(false);
-    }
-  };
+      await postJson<
+        Record<string, unknown>,
+        {
+          projectId: string
+          styleId: string | null
+          customStyleUrl: string
+          options: {
+            silenceThreshold: number
+            silenceDuration: number
+            subtitles: never[]
+            quality: string
+            format: string
+            watermark: boolean
+          }
+        }
+      >('/api/process', {
+        projectId,
+        styleId: selectedStyle || null,
+        customStyleUrl: youtubeUrl,
+        options: {
+          silenceThreshold: -35,
+          silenceDuration: 0.5,
+          subtitles: [],
+          quality: '720p',
+          format: 'mp4',
+          watermark: false,
+        },
+      })
 
-  // プロジェクトIDがない場合はホームへ戻る
-  useEffect(() => {
-    if (!projectId) {
-      router.push('/home');
+      router.push(`/processing/${projectId}`)
+    } catch (error) {
+      setError('root', {
+        message: error instanceof Error ? error.message : 'エラーが発生しました',
+      })
     }
-  }, [projectId, router]);
+  })
+
+  if (!projectId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="rounded-2xl border border-border bg-surface p-8 text-center">
+          <h1 className="text-2xl font-bold">プロジェクトIDが見つかりません</h1>
+          <p className="mt-2 text-muted">
+            動画アップロードからやり直してください。
+          </p>
+          <Link
+            href="/home"
+            className="mt-6 inline-flex rounded-lg bg-primary px-4 py-2 font-medium text-white"
+          >
+            ホームへ戻る
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
       <nav className="border-b border-border backdrop-blur-sm bg-background/80 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -127,7 +174,6 @@ function StylesPageContent() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">編集スタイルを選択</h1>
@@ -136,14 +182,17 @@ function StylesPageContent() {
           </p>
         </div>
 
-        {/* Preset Styles */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold mb-6">プリセットスタイル</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {presetStyles.map((style) => (
               <button
                 key={style.id}
-                onClick={() => setSelectedStyle(style.id)}
+                type="button"
+                onClick={() => {
+                  setValue('selectedStyle', style.id, { shouldValidate: true })
+                  clearErrors('youtubeUrl')
+                }}
                 className={`text-left p-6 rounded-xl border-2 transition-all ${
                   selectedStyle === style.id
                     ? 'border-primary bg-primary/10'
@@ -158,7 +207,6 @@ function StylesPageContent() {
           </div>
         </div>
 
-        {/* Custom YouTube Style */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold mb-6">カスタムスタイル学習</h2>
           <div className="bg-surface border border-border rounded-xl p-8">
@@ -176,11 +224,13 @@ function StylesPageContent() {
                 </p>
                 <input
                   type="url"
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  {...register('youtubeUrl')}
                   placeholder="https://www.youtube.com/watch?v=..."
                   className="w-full px-4 py-3 bg-background border border-border rounded-lg focus:outline-none focus:border-primary transition-colors text-foreground"
                 />
+                {errors.youtubeUrl?.message && (
+                  <p className="mt-2 text-sm text-red-500">{errors.youtubeUrl.message}</p>
+                )}
               </div>
             </div>
 
@@ -192,7 +242,12 @@ function StylesPageContent() {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {errors.root?.message && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+            {errors.root.message}
+          </div>
+        )}
+
         <div className="flex justify-center gap-4">
           <Link
             href="/home"
@@ -200,21 +255,16 @@ function StylesPageContent() {
           >
             戻る
           </Link>
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-              {error}
-            </div>
-          )}
           <button
-            disabled={isStarting || (!selectedStyle && !youtubeUrl)}
-            onClick={handleStartProcessing}
+            disabled={isSubmitting || (!selectedStyle && !youtubeUrl)}
+            onClick={() => void onSubmit()}
             className={`px-8 py-4 rounded-xl font-bold text-lg transition-all ${
               selectedStyle || youtubeUrl
                 ? 'bg-gradient-to-r from-primary to-secondary text-white hover:shadow-xl hover:shadow-primary/50'
                 : 'bg-surface text-muted cursor-not-allowed'
-            } ${isStarting ? 'opacity-50 cursor-wait' : ''}`}
+            } ${isSubmitting ? 'opacity-50 cursor-wait' : ''}`}
           >
-            {isStarting ? (
+            {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[20px] animate-spin">sync</span>
                 処理を開始中...
@@ -226,20 +276,22 @@ function StylesPageContent() {
         </div>
       </main>
     </div>
-  );
+  )
 }
 
 export default function StylesPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <span className="material-symbols-outlined text-4xl animate-spin text-primary">sync</span>
-          <p className="text-muted">読み込み中...</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <span className="material-symbols-outlined text-4xl animate-spin text-primary">sync</span>
+            <p className="text-muted">読み込み中...</p>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <StylesPageContent />
     </Suspense>
-  );
+  )
 }

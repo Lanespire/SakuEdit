@@ -1,166 +1,144 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { Prisma } from '@prisma/client'
+import { z } from 'zod'
 import prisma from '@/lib/db'
-import { auth } from '@/lib/auth'
+import { getBillingSnapshot } from '@/lib/billing'
+import { pickDefined } from '@/lib/server/object'
+import {
+  forbidden,
+  getRequiredUserId,
+  handleRoute,
+  notFound,
+  ok,
+  parseJson,
+} from '@/lib/server/route'
 
-// GET /api/projects/[id] - Get project details
-export async function GET(
+const updateProjectSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  status: z.string().optional(),
+  progress: z.number().optional(),
+  progressMessage: z.string().optional(),
+  styleId: z.string().nullable().optional(),
+  startedAt: z.coerce.date().nullable().optional(),
+  completedAt: z.coerce.date().nullable().optional(),
+  canceledAt: z.coerce.date().nullable().optional(),
+  lastError: z.string().nullable().optional(),
+})
+
+async function getOwnedProject(projectId: string, userId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  })
+
+  if (!project) {
+    notFound('Project not found')
+  }
+
+  if (project.userId !== userId) {
+    forbidden('Project not found')
+  }
+
+  return project
+}
+
+export const GET = handleRoute(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    })
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  const userId = await getRequiredUserId(request)
+  const { id: projectId } = await params
 
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: projectId } = await params
-
-    const project = await prisma.project.findUnique({
-      where: {
-        id: projectId,
-        userId: session.user.id,
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+      userId,
+    },
+    include: {
+      videos: true,
+      subtitles: {
+        orderBy: { startTime: 'asc' },
       },
-      include: {
-        videos: true,
-        subtitles: {
-          orderBy: { startTime: 'asc' },
-        },
-        style: true,
-        aiSuggestions: {
-          orderBy: { priority: 'desc' },
-        },
-        timeline: {
-          include: {
-            tracks: {
-              include: {
-                clips: true,
-              },
-              orderBy: { order: 'asc' },
+      style: true,
+      aiSuggestions: {
+        orderBy: { priority: 'desc' },
+      },
+      timeline: {
+        include: {
+          tracks: {
+            include: {
+              clips: true,
             },
+            orderBy: { order: 'asc' },
           },
         },
-        markers: {
-          orderBy: { time: 'asc' },
-        },
       },
-    })
-
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ project })
-  } catch (error) {
-    console.error('Error fetching project:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch project' },
-      { status: 500 }
-    )
-  }
-}
-
-// PATCH /api/projects/[id] - Update project
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    })
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { id: projectId } = await params
-
-    // Verify project ownership
-    const existingProject = await prisma.project.findUnique({
-      where: { id: projectId },
-    })
-
-    if (!existingProject || existingProject.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
-
-    const allowedUpdates = [
-      'name',
-      'status',
-      'progress',
-      'progressMessage',
-      'styleId',
-      'startedAt',
-      'completedAt',
-      'canceledAt',
-      'lastError',
-    ]
-
-    const updateData: any = {}
-    for (const key of allowedUpdates) {
-      if (body[key] !== undefined) {
-        updateData[key] = body[key]
-      }
-    }
-
-    const project = await prisma.project.update({
-      where: { id: projectId },
-      data: updateData,
-      include: {
-        videos: true,
-        style: true,
+      markers: {
+        orderBy: { time: 'asc' },
       },
-    })
+    },
+  })
 
-    return NextResponse.json({ project })
-  } catch (error) {
-    console.error('Error updating project:', error)
-    return NextResponse.json(
-      { error: 'Failed to update project' },
-      { status: 500 }
-    )
+  if (!project) {
+    notFound('Project not found')
   }
-}
 
-// DELETE /api/projects/[id] - Delete project
-export async function DELETE(
+  const billing = await getBillingSnapshot(userId)
+
+  return ok({
+    project,
+    billing: {
+      planId: billing.plan.id,
+      remainingSeconds: billing.remainingSeconds,
+      usedSeconds: billing.usedSeconds,
+    },
+  })
+}, { onError: 'Failed to fetch project' })
+
+export const PATCH = handleRoute(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    })
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  const userId = await getRequiredUserId(request)
+  const { id: projectId } = await params
+  const body = await parseJson(request, updateProjectSchema)
 
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  await getOwnedProject(projectId, userId)
 
-    const { id: projectId } = await params
+  const updateData = pickDefined(body, [
+    'name',
+    'status',
+    'progress',
+    'progressMessage',
+    'styleId',
+    'startedAt',
+    'completedAt',
+    'canceledAt',
+    'lastError',
+  ]) as Prisma.ProjectUpdateInput
 
-    // Verify project ownership
-    const existingProject = await prisma.project.findUnique({
-      where: { id: projectId },
-    })
+  const project = await prisma.project.update({
+    where: { id: projectId },
+    data: updateData,
+    include: {
+      videos: true,
+      style: true,
+    },
+  })
 
-    if (!existingProject || existingProject.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
+  return ok({ project })
+}, { onError: 'Failed to update project' })
 
-    await prisma.project.delete({
-      where: { id: projectId },
-    })
+export const DELETE = handleRoute(async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  const userId = await getRequiredUserId(request)
+  const { id: projectId } = await params
 
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting project:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete project' },
-      { status: 500 }
-    )
-  }
-}
+  await getOwnedProject(projectId, userId)
+  await prisma.project.delete({
+    where: { id: projectId },
+  })
+
+  return ok({ success: true })
+}, { onError: 'Failed to delete project' })

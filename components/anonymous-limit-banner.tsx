@@ -1,47 +1,39 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { initFingerprint } from '@/lib/fingerprint'
+import { useSWR } from '@/lib/client/swr'
+import {
+  fetchAnonymousUsage,
+  type AnonymousUsageInfo,
+} from '@/lib/client/anonymous-usage'
 import { LogIn, Sparkles, Zap } from 'lucide-react'
-
-interface UsageInfo {
-  dailyCount: number
-  dailyLimit: number
-  remaining: number
-  maxVideoMinutes: number
-  canProcess: boolean
-  blockedUntil: string | null
-}
 
 interface AnonymousLimitBannerProps {
   onLoginClick?: () => void
 }
 
-export function AnonymousLimitBanner({ onLoginClick }: AnonymousLimitBannerProps) {
-  const [usage, setUsage] = useState<UsageInfo | null>(null)
-  const [loading, setLoading] = useState(true)
+function useAnonymousUsage() {
+  return useSWR<AnonymousUsageInfo>('anonymous-usage', fetchAnonymousUsage, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  })
+}
 
-  useEffect(() => {
-    async function fetchUsage() {
-      try {
-        const fingerprint = await initFingerprint()
-        const res = await fetch('/api/anonymous/usage', {
-          headers: { 'x-fingerprint': fingerprint },
-        })
-        if (res.ok) {
-          setUsage(await res.json())
-        }
-      } catch (error) {
-        console.error('Failed to fetch usage:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchUsage()
-  }, [])
+function handleLogin(onLoginClick?: () => void, fallbackPath?: string) {
+  if (onLoginClick) {
+    onLoginClick()
+    return
+  }
 
-  if (loading || !usage) return null
+  window.location.href = fallbackPath || '/auth/signin'
+}
 
+function UsageBannerBody({
+  usage,
+  onLoginClick,
+}: {
+  usage: AnonymousUsageInfo
+  onLoginClick?: () => void
+}) {
   const isNearLimit = usage.remaining <= 1
   const isAtLimit = !usage.canProcess
 
@@ -51,12 +43,11 @@ export function AnonymousLimitBanner({ onLoginClick }: AnonymousLimitBannerProps
         isAtLimit
           ? 'border-red-200 bg-red-50'
           : isNearLimit
-          ? 'border-yellow-200 bg-yellow-50'
-          : 'border-blue-200 bg-blue-50'
+            ? 'border-yellow-200 bg-yellow-50'
+            : 'border-blue-200 bg-blue-50'
       }`}
     >
       <div className="flex items-start gap-3">
-        {/* Icon */}
         <div
           className={`flex-shrink-0 rounded-full p-2 ${
             isAtLimit ? 'bg-red-100' : isNearLimit ? 'bg-yellow-100' : 'bg-blue-100'
@@ -69,7 +60,6 @@ export function AnonymousLimitBanner({ onLoginClick }: AnonymousLimitBannerProps
           )}
         </div>
 
-        {/* Content */}
         <div className="flex-1">
           {isAtLimit ? (
             <>
@@ -91,14 +81,12 @@ export function AnonymousLimitBanner({ onLoginClick }: AnonymousLimitBannerProps
             </>
           )}
 
-          {/* Login CTA */}
           <button
             onClick={() => {
-              if (onLoginClick) {
-                onLoginClick()
-              } else {
-                window.location.href = '/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname)
-              }
+              handleLogin(
+                onLoginClick,
+                '/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname),
+              )
             }}
             className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-md"
           >
@@ -111,26 +99,18 @@ export function AnonymousLimitBanner({ onLoginClick }: AnonymousLimitBannerProps
   )
 }
 
-// Compact version for sidebar/inline use
-export function AnonymousLimitCompact({ onLoginClick }: AnonymousLimitBannerProps) {
-  const [usage, setUsage] = useState<UsageInfo | null>(null)
+export function AnonymousLimitBanner({ onLoginClick }: AnonymousLimitBannerProps) {
+  const { data: usage, isLoading } = useAnonymousUsage()
 
-  useEffect(() => {
-    async function fetchUsage() {
-      try {
-        const fingerprint = await initFingerprint()
-        const res = await fetch('/api/anonymous/usage', {
-          headers: { 'x-fingerprint': fingerprint },
-        })
-        if (res.ok) {
-          setUsage(await res.json())
-        }
-      } catch (error) {
-        console.error('Failed to fetch usage:', error)
-      }
-    }
-    fetchUsage()
-  }, [])
+  if (isLoading || !usage) {
+    return null
+  }
+
+  return <UsageBannerBody usage={usage} onLoginClick={onLoginClick} />
+}
+
+export function AnonymousLimitCompact({ onLoginClick }: AnonymousLimitBannerProps) {
+  const { data: usage } = useAnonymousUsage()
 
   if (!usage) return null
 
@@ -147,11 +127,7 @@ export function AnonymousLimitCompact({ onLoginClick }: AnonymousLimitBannerProp
       </span>
       <button
         onClick={() => {
-          if (onLoginClick) {
-            onLoginClick()
-          } else {
-            window.location.href = '/auth/signin'
-          }
+          handleLogin(onLoginClick, '/auth/signin')
         }}
         className="font-medium underline hover:no-underline"
       >
