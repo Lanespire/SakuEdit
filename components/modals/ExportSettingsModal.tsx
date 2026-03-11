@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { canUseQuality, getPlanDefinition, type PlanId } from '@/lib/plans'
 
 export interface ExportSettings {
   quality: '720p' | '1080p' | '4k'
@@ -13,10 +14,15 @@ export interface ExportSettings {
 interface ExportSettingsModalProps {
   onClose: () => void
   onExport: (settings: ExportSettings) => void
-  isPro?: boolean
+  planId?: PlanId
 }
 
-export default function ExportSettingsModal({ onClose, onExport, isPro = false }: ExportSettingsModalProps) {
+export default function ExportSettingsModal({
+  onClose,
+  onExport,
+  planId = 'free',
+}: ExportSettingsModalProps) {
+  const plan = getPlanDefinition(planId)
   const [settings, setSettings] = useState<ExportSettings>({
     quality: '720p',
     format: 'mp4',
@@ -26,9 +32,9 @@ export default function ExportSettingsModal({ onClose, onExport, isPro = false }
   })
 
   const qualityOptions = [
-    { id: '720p', label: '720p HD', size: '~45MB', pro: false },
-    { id: '1080p', label: '1080p Full HD', size: '~120MB', pro: true, recommended: true },
-    { id: '4k', label: '4K Ultra HD', size: '~400MB', pro: true },
+    { id: '720p', label: '720p HD', size: '~45MB' },
+    { id: '1080p', label: '1080p Full HD', size: '~120MB', recommended: true, gate: 'Pro以上' },
+    { id: '4k', label: '4K Ultra HD', size: '~400MB', gate: 'Business以上', multiplier: '1.5x' },
   ]
 
   const formatOptions = [
@@ -38,13 +44,13 @@ export default function ExportSettingsModal({ onClose, onExport, isPro = false }
   ]
 
   const subtitleOptions = [
-    { id: 'burn', label: '動画に焼き込む' },
-    { id: 'srt', label: '別ファイルで出力(SRT)' },
-    { id: 'both', label: '両方' },
+    { id: 'burn', label: '動画に焼き込む', disabled: false },
+    { id: 'srt', label: '別ファイルで出力(SRT)', disabled: !plan.hasSrtExport },
+    { id: 'both', label: '両方', disabled: !plan.hasSrtExport },
   ]
 
   const handleQualityChange = (quality: '720p' | '1080p' | '4k') => {
-    if (quality !== '720p' && !isPro) return
+    if (!canUseQuality(plan.id, quality)) return
     setSettings(prev => ({ ...prev, quality }))
   }
 
@@ -73,7 +79,7 @@ export default function ExportSettingsModal({ onClose, onExport, isPro = false }
             <label className="block text-sm font-medium text-white/70 mb-3">解像度</label>
             <div className="space-y-2">
               {qualityOptions.map((option) => {
-                const isDisabled = option.pro && !isPro
+                const isDisabled = !canUseQuality(plan.id, option.id as typeof settings.quality)
                 const isSelected = settings.quality === option.id
                 return (
                   <button
@@ -104,14 +110,24 @@ export default function ExportSettingsModal({ onClose, onExport, isPro = false }
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-white/50">{option.size}</span>
-                      {option.pro && (
-                        <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">PRO</span>
+                      {option.gate && (
+                        <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                          {option.gate}
+                        </span>
+                      )}
+                      {option.multiplier && (
+                        <span className="text-[10px] bg-white/10 text-white/70 px-1.5 py-0.5 rounded">
+                          {option.multiplier}
+                        </span>
                       )}
                     </div>
                   </button>
                 )
               })}
             </div>
+            <p className="mt-2 text-xs text-white/50">
+              4KはBusiness以上で利用でき、処理分数を1.5倍消費します。
+            </p>
           </div>
 
           {/* Format & Subtitle */}
@@ -137,7 +153,9 @@ export default function ExportSettingsModal({ onClose, onExport, isPro = false }
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 {subtitleOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  <option key={opt.id} value={opt.id} disabled={opt.disabled}>
+                    {opt.disabled ? `${opt.label}（Pro以上）` : opt.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -146,20 +164,24 @@ export default function ExportSettingsModal({ onClose, onExport, isPro = false }
           {/* Options */}
           <div className="space-y-3">
             {/* Watermark */}
-            <label className={`flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl ${!isPro ? 'opacity-60' : 'cursor-pointer hover:bg-white/10'}`}>
+            <label
+              className={`flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl ${
+                plan.hasWatermark ? 'opacity-60' : 'cursor-pointer hover:bg-white/10'
+              }`}
+            >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-white/70">watermark</span>
                 <div>
                   <p className="text-sm text-white">ウォーターマークを削除</p>
-                  {!isPro && (
-                    <p className="text-xs text-primary">PROにアップグレード</p>
+                  {plan.hasWatermark && (
+                    <p className="text-xs text-primary">Pro以上で利用できます</p>
                   )}
                 </div>
               </div>
               <input
                 type="checkbox"
                 checked={settings.removeWatermark}
-                disabled={!isPro}
+                disabled={plan.hasWatermark}
                 onChange={(e) => setSettings(prev => ({ ...prev, removeWatermark: e.target.checked }))}
                 className="size-5 rounded border-white/30 bg-white/5 text-primary focus:ring-primary"
                 data-test-id="export-watermark-checkbox"
@@ -167,17 +189,24 @@ export default function ExportSettingsModal({ onClose, onExport, isPro = false }
             </label>
 
             {/* Thumbnail */}
-            <label className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10">
+            <label
+              className={`flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl ${
+                plan.hasThumbnail ? 'cursor-pointer hover:bg-white/10' : 'opacity-60'
+              }`}
+            >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-white/70">image</span>
                 <div>
                   <p className="text-sm text-white">サムネイルも書き出す</p>
-                  <p className="text-xs text-white/50">JPG形式で出力</p>
+                  <p className="text-xs text-white/50">
+                    {plan.hasThumbnail ? 'JPG形式で出力' : 'Pro以上で利用できます'}
+                  </p>
                 </div>
               </div>
               <input
                 type="checkbox"
                 checked={settings.exportThumbnail}
+                disabled={!plan.hasThumbnail}
                 onChange={(e) => setSettings(prev => ({ ...prev, exportThumbnail: e.target.checked }))}
                 className="size-5 rounded border-white/30 bg-white/5 text-primary focus:ring-primary"
                 data-test-id="export-thumbnail-checkbox"

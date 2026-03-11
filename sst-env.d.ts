@@ -6,6 +6,18 @@
 
 declare module "sst" {
   export interface Resource {
+    "StripePublishableKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "StripeSecretKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "StripeWebhookSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "VideoBucket": {
       "name": string
       "type": "sst.aws.Bucket"

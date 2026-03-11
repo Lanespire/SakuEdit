@@ -72,6 +72,11 @@ sst secrets set --stage production NextAuthSecret "your-production-secret"
 # Deepgram API (ASR用)
 sst secrets set DeepgramApiKeyDev "dg_xxx..."
 sst secrets set --stage production DeepgramApiKey "dg_xxx..."
+
+# Stripe Sandbox
+sst secret set StripePublishableKey "pk_test_xxx"
+sst secret set StripeSecretKey "sk_test_xxx"
+sst secret set StripeWebhookSecret "whsec_xxx"
 ```
 
 ### 3. Prisma スキーマの修正
@@ -116,6 +121,33 @@ npx sst dev
 # または通常のNext.js dev server
 npm run dev
 ```
+
+### Stripe Sandbox をSSTで使う
+
+`sst.config.ts` で `pulumi-stripe` provider を使って Pro / Business の Product と Price を作成します。ローカルでは以下の流れです。
+
+```bash
+# 1. Stripe test key を SST Secret に保存
+sst secret set StripePublishableKey "pk_test_xxx"
+sst secret set StripeSecretKey "sk_test_xxx"
+
+# 2. Webhook secret は stripe listen で表示された値を保存
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+sst secret set StripeWebhookSecret "whsec_xxx"
+
+# 3. SST dev を起動
+npx sst dev
+
+# 4. Checkout / Webhook の動作確認
+stripe trigger checkout.session.completed
+stripe trigger customer.subscription.updated
+```
+
+注意:
+
+- `payment_intent.succeeded` だけではサブスク同期は完了しません。`checkout.session.completed` と `customer.subscription.updated` を使ってください。
+- ローカル webhook 転送先は `localhost:3000/api/stripe/webhook` です。
+- デプロイ環境で Stripe 側に webhook endpoint を自動作成したい場合は、`STRIPE_WEBHOOK_URL` を設定して `sst deploy` します。
 
 ---
 

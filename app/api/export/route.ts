@@ -2,10 +2,36 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { auth } from '@/lib/auth'
 import { exportVideo, generateSRTContent, generateThumbnail } from '@/lib/video-processor'
+import {
+  calculateExportChargeSeconds,
+  getBillingSnapshot,
+  validateExportAccess,
+} from '@/lib/billing'
+import type { ExportQuality, SubtitleExportOption } from '@/lib/plans'
 import path from 'path'
 import fs from 'fs/promises'
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads'
+
+function normalizeQuality(value: unknown): ExportQuality {
+  return value === '1080p' || value === '4k' ? value : '720p'
+}
+
+function normalizeSubtitleOption(value: unknown): SubtitleExportOption {
+  if (value === 'burned') return 'burn'
+  if (value === 'separate') return 'srt'
+  return value === 'srt' || value === 'both' ? value : 'burn'
+}
+
+function is4kSource(width?: number | null, height?: number | null) {
+  if (!width || !height) {
+    return true
+  }
+
+  const longEdge = Math.max(width, height)
+  const shortEdge = Math.min(width, height)
+  return longEdge >= 3840 && shortEdge >= 2160
+}
 
 // POST /api/export - Create export job and process
 export async function POST(request: NextRequest) {
@@ -32,12 +58,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       projectId,
-      quality = '720p',
+      quality: requestedQuality = '720p',
       format = 'mp4',
-      subtitleOption = 'burned',
+      subtitleOption: requestedSubtitleOption = 'burn',
       removeWatermark = false,
       exportThumbnail = false,
     } = body
+    const quality = normalizeQuality(requestedQuality)
+    const subtitleOption = normalizeSubtitleOption(requestedSubtitleOption)
 
     if (!projectId) {
       return NextResponse.json(
@@ -65,6 +93,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'No video source found' },
         { status: 400 }
+      )
+    }
+
+    const billing = await getBillingSnapshot(userId)
+    const plan = billing.plan
+    const sourceVideo = project.videos[0]
+    const sourceDurationSeconds = Math.ceil(sourceVideo.duration || 0)
+    const billedSeconds = calculateExportChargeSeconds(sourceDurationSeconds, quality)
+
+    const accessError = validateExportAccess(plan.id, {
+      quality,
+      subtitleOption,
+      removeWatermark,
+      exportThumbnail,
+    })
+
+    if (accessError) {
+      return NextResponse.json({ error: accessError }, { status: 403 })
+    }
+
+    if (sourceDurationSeconds > plan.maxSingleVideoMinutes * 60) {
+      return NextResponse.json(
+        {
+          error: `現在のプランでは${plan.maxSingleVideoMinutes}分を超える動画は書き出せません`,
+        },
+        { status: 403 },
+      )
+    }
+
+    if (quality === '4k' && !is4kSource(sourceVideo.width, sourceVideo.height)) {
+      return NextResponse.json(
+        { error: '4K書き出しは4Kソース動画でのみ利用できます' },
+        { status: 400 },
+      )
+    }
+
+    if (billedSeconds > billing.remainingSeconds) {
+      return NextResponse.json(
+        {
+          error: '今月の処理分数が不足しています。上位プランへのアップグレードを検討してください',
+        },
+        { status: 402 },
       )
     }
 
@@ -105,8 +175,8 @@ export async function POST(request: NextRequest) {
       const exportResult = await exportVideo(inputPath, outputPath, {
         quality,
         format,
-        subtitles: subtitleOption === 'burned' ? subtitles : [],
-        burnSubtitles: subtitleOption === 'burned',
+        subtitles: subtitleOption === 'burn' || subtitleOption === 'both' ? subtitles : [],
+        burnSubtitles: subtitleOption === 'burn' || subtitleOption === 'both',
       })
 
       if (!exportResult.success) {
@@ -126,7 +196,7 @@ export async function POST(request: NextRequest) {
 
       // Generate SRT if separate subtitles requested
       let srtPath: string | null = null
-      if (subtitleOption === 'separate' && subtitles.length > 0) {
+      if ((subtitleOption === 'srt' || subtitleOption === 'both') && subtitles.length > 0) {
         srtPath = path.join(outputDir, `subtitles_${Date.now()}.srt`)
         const srtContent = generateSRTContent(subtitles)
         await fs.writeFile(srtPath, srtContent, 'utf-8')
@@ -142,12 +212,34 @@ export async function POST(request: NextRequest) {
           completedAt: new Date(),
           // API URLs for frontend
           videoUrl: `/api/export/${projectId}/${exportJob.id}/video`,
-          srtUrl: subtitleOption === 'separate' ? `/api/export/${projectId}/${exportJob.id}/srt` : null,
+          srtUrl:
+            subtitleOption === 'srt' || subtitleOption === 'both'
+              ? `/api/export/${projectId}/${exportJob.id}/srt`
+              : null,
           thumbnailUrl: exportThumbnail ? `/api/export/${projectId}/${exportJob.id}/thumbnail` : null,
           // Actual file paths for download
           videoPath: outputPath,
           srtPath: srtPath,
           thumbnailPath: thumbnailPath,
+        },
+      })
+
+      await prisma.usageLog.create({
+        data: {
+          userId,
+          action: 'export',
+          resourceId: completedJob.id,
+          duration: billedSeconds,
+          metadata: {
+            projectId,
+            planId: plan.id,
+            quality,
+            billedSeconds,
+            sourceDurationSeconds,
+            subtitleOption,
+            exportThumbnail,
+            removeWatermark,
+          },
         },
       })
 
@@ -161,6 +253,10 @@ export async function POST(request: NextRequest) {
         success: true,
         exportJob: completedJob,
         downloadUrl: completedJob.videoUrl,
+        billing: {
+          chargedSeconds: billedSeconds,
+          remainingSeconds: Math.max(0, billing.remainingSeconds - billedSeconds),
+        },
       })
     } catch (processError) {
       // Update export job as failed

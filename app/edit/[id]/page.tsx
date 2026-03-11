@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { SubtitleEditModal, ExportSettingsModal, type Subtitle, type ExportSettings } from '@/components/modals'
+import type { PlanId } from '@/lib/plans'
 
 interface AISuggestion {
   id: string
@@ -38,6 +39,12 @@ interface ProjectData {
   }
 }
 
+interface BillingData {
+  planId: PlanId
+  remainingSeconds: number
+  usedSeconds: number
+}
+
 export default function EditPage() {
   const params = useParams()
   const router = useRouter()
@@ -49,6 +56,7 @@ export default function EditPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(0)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
+  const [billingData, setBillingData] = useState<BillingData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isExporting, setIsExporting] = useState(false)
@@ -112,9 +120,10 @@ export default function EditPage() {
         const project: ProjectData = data.project
 
         setProjectData(project)
+        setBillingData(data.billing ?? null)
 
         // Convert DB subtitles to display format
-        const displaySubtitles: Subtitle[] = project.subtitles.map((sub, index) => ({
+        const displaySubtitles: Subtitle[] = project.subtitles.map((sub) => ({
           id: sub.id,
           text: sub.text,
           startTime: sub.startTime,
@@ -191,30 +200,20 @@ export default function EditPage() {
       }
 
       const data = await res.json()
-
-      // Start polling for export completion
-      const checkExportStatus = async () => {
-        try {
-          const statusRes = await fetch(`/api/export/${_projectId}/${data.exportJob.id}`)
-          if (statusRes.ok) {
-            const statusData = await statusRes.json()
-            if (statusData.exportJob.status === 'COMPLETED') {
-              // Download the video
-              window.location.href = statusData.exportJob.videoUrl
-            } else if (statusData.exportJob.status === 'FAILED') {
-              throw new Error(statusData.exportJob.error || '書き出しに失敗しました')
-            } else {
-              // Still processing, check again
-              setTimeout(checkExportStatus, 2000)
-            }
-          }
-        } catch (err) {
-          console.error('Error checking export status:', err)
-          setError(err instanceof Error ? err.message : 'ステータス確認中にエラーが発生しました')
-        }
+      if (data.downloadUrl) {
+        window.location.href = data.downloadUrl
       }
 
-      checkExportStatus()
+      if (data.billing) {
+        setBillingData((prev) =>
+          prev
+            ? {
+                ...prev,
+                remainingSeconds: data.billing.remainingSeconds,
+              }
+            : prev,
+        )
+      }
     } catch (err) {
       console.error('Export error:', err)
       setError(err instanceof Error ? err.message : 'エラーが発生しました')
@@ -634,7 +633,7 @@ export default function EditPage() {
         <ExportSettingsModal
           onClose={() => setIsExportModalOpen(false)}
           onExport={handleExport}
-          isPro={false}
+          planId={billingData?.planId ?? 'free'}
         />
       )}
     </div>

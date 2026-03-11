@@ -1,6 +1,52 @@
 import { PrismaClient } from '@prisma/client'
+import { hashPassword } from 'better-auth/crypto'
 
 const prisma = new PrismaClient()
+const DEMO_USER_EMAIL = 'demo@sakuedit.local'
+const DEMO_USER_PASSWORD = 'demo123456'
+const DEMO_USER_NAME = 'Demo User'
+
+async function ensureDemoUser() {
+  if (process.env.NODE_ENV === 'production') {
+    return
+  }
+
+  const password = await hashPassword(DEMO_USER_PASSWORD)
+
+  const demoUser = await prisma.user.upsert({
+    where: { email: DEMO_USER_EMAIL },
+    update: {
+      emailVerified: true,
+      name: DEMO_USER_NAME,
+    },
+    create: {
+      email: DEMO_USER_EMAIL,
+      name: DEMO_USER_NAME,
+      emailVerified: true,
+    },
+  })
+
+  await prisma.account.upsert({
+    where: {
+      providerId_accountId: {
+        providerId: 'credential',
+        accountId: demoUser.id,
+      },
+    },
+    update: {
+      userId: demoUser.id,
+      password,
+    },
+    create: {
+      userId: demoUser.id,
+      providerId: 'credential',
+      accountId: demoUser.id,
+      password,
+    },
+  })
+
+  console.log('Demo user ready:', DEMO_USER_EMAIL)
+}
 
 async function main() {
   console.log('Starting seed...')
@@ -61,7 +107,7 @@ async function main() {
       monthlyProcessingMinutes: 2400,
       monthlyStyleAnalysisCount: 50,
       styleSlots: 100,
-      maxQuality: '1080p',
+      maxQuality: '4k',
       hasWatermark: false,
       hasSrtExport: true,
       hasThumbnail: true,
@@ -91,6 +137,8 @@ async function main() {
     },
   })
   console.log('Created Enterprise plan:', enterprisePlan.id)
+
+  await ensureDemoUser()
 
   console.log('Seed completed successfully!')
 }

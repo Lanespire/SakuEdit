@@ -1,3 +1,4 @@
+/* eslint-disable-next-line @typescript-eslint/triple-slash-reference */
 /// <reference path="./.sst/platform/config.d.ts" />
 
 export default $config({
@@ -11,10 +12,38 @@ export default $config({
         aws: {
           profile: "sakuedit",
         },
+        stripe: {
+          version: "0.0.28",
+        },
       },
     };
   },
   async run() {
+    const { createStripeResources } = await import("./infra/stripe");
+    const isDevStage = $app.stage === "dev";
+
+    const stripePublishableKey = new sst.Secret(
+      "StripePublishableKey",
+      "pk_test_replace_me",
+    );
+    const stripeSecretKey = new sst.Secret(
+      "StripeSecretKey",
+      "sk_test_replace_me",
+    );
+    const stripeWebhookSecret = new sst.Secret(
+      "StripeWebhookSecret",
+      "whsec_replace_me",
+    );
+
+    const stripeWebhookUrl = process.env.STRIPE_WEBHOOK_URL;
+    const stripeProvider = new stripe.Provider("StripeProvider", {
+      apiKey: stripeSecretKey.value,
+    });
+    const stripeResources = createStripeResources({
+      provider: stripeProvider,
+      webhookUrl: stripeWebhookUrl,
+    });
+
     // ========================================
     // S3 Bucket for video storage
     // ========================================
@@ -54,20 +83,57 @@ export default $config({
     // Main Next.js Application
     // ========================================
     const web = new sst.aws.Nextjs("Web", {
-      link: [videoBucket, videoProcessor],
+      link: [
+        videoBucket,
+        videoProcessor,
+        stripePublishableKey,
+        stripeSecretKey,
+        stripeWebhookSecret,
+      ],
       environment: {
         // Video bucket name accessible via Resource.VideoBucket.name
         // Video processor URL accessible via Resource.VideoProcessor.url
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: stripePublishableKey.value,
+        STRIPE_PRO_PRICE_ID: stripeResources?.pro.monthlyPriceId ?? "",
+        STRIPE_BUSINESS_PRICE_ID: stripeResources?.business.monthlyPriceId ?? "",
       },
     });
+
+    if (isDevStage) {
+      new sst.x.DevCommand("StripeCli", {
+        link: [stripeSecretKey],
+        environment: {
+          STRIPE_API_KEY: stripeSecretKey.value,
+          STRIPE_WEBHOOK_FORWARD_URL: "http://127.0.0.1:3000/api/stripe/webhook",
+        },
+        dev: {
+          title: "Stripe CLI",
+          autostart: true,
+          command:
+            "zsh -lc 'printf \"Stripe CLI ready\\nlisten: stripe listen --forward-to $STRIPE_WEBHOOK_FORWARD_URL\\ntrigger: stripe trigger checkout.session.completed\\n\"; exec zsh -i'",
+        },
+      });
+    }
 
     // ========================================
     // Outputs
     // ========================================
     return {
-    url: web.url,
-    bucketName: videoBucket.name,
-    videoProcessorUrl: videoProcessor.url,
+      url: web.url,
+      bucketName: videoBucket.name,
+      videoProcessorUrl: videoProcessor.url,
+      stripe: stripeResources
+        ? {
+            pro: stripeResources.pro,
+            business: stripeResources.business,
+            webhook: stripeResources.webhook
+              ? {
+                  endpointId: stripeResources.webhook.endpointId,
+                  url: stripeResources.webhook.url,
+                }
+              : null,
+          }
+        : null,
     };
   },
 });
