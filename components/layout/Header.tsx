@@ -86,7 +86,7 @@ export default function Header({ currentPage }: HeaderProps) {
             </>
           ) : (
             <Link
-              href="/api/auth/signin"
+              href="/auth/signin"
               className="px-4 py-2 text-sm font-medium text-[#6b584b] dark:text-[#9e8b7d] hover:text-primary transition-colors"
               data-test-id="header-login"
             >

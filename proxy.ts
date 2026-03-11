@@ -25,7 +25,6 @@ const protectedPrefixes = [
   '/processing/',
   '/styles',
   '/api/projects',
-  '/api/upload',
   '/api/export',
 ]
 
@@ -56,7 +55,7 @@ function isProtectedRoute(pathname: string): boolean {
   return false
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow public routes
@@ -70,9 +69,17 @@ export async function middleware(request: NextRequest) {
     const sessionToken = request.cookies.get('better-auth.session_token')
 
     if (!sessionToken) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        )
+      }
+
       // Redirect to signin with callback URL
       const signinUrl = new URL('/auth/signin', request.url)
-      signinUrl.searchParams.set('callbackUrl', pathname)
+      const callbackUrl = `${pathname}${request.nextUrl.search}`
+      signinUrl.searchParams.set('callbackUrl', callbackUrl)
       return NextResponse.redirect(signinUrl)
     }
   }
@@ -88,7 +95,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api/upload (large multipart bodies should bypass proxy)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/|api/upload).*)',
   ],
 }

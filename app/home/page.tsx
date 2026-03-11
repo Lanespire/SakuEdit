@@ -5,16 +5,33 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from '@/lib/auth-client'
 
+async function readJsonSafely<T>(response: Response): Promise<T | null> {
+  const text = await response.text()
+
+  if (!text) {
+    return null
+  }
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return null
+  }
+}
+
 export default function HomePage() {
   const router = useRouter()
   const { data: session } = useSession()
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [youtubeUrl, setYoutubeUrl] = useState('')
   const [referenceUrl, setReferenceUrl] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
+
+  const redirectToSignIn = () => {
+    router.push('/auth/signin?callbackUrl=' + encodeURIComponent('/home'))
+  }
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -35,7 +52,6 @@ export default function HomePage() {
     const videoFile = files.find((file) => file.type.startsWith('video/'))
     if (videoFile) {
       setSelectedFile(videoFile)
-      setYoutubeUrl('')
     }
   }
 
@@ -43,13 +59,18 @@ export default function HomePage() {
     const files = e.target.files
     if (files && files[0]) {
       setSelectedFile(files[0])
-      setYoutubeUrl('')
     }
   }
 
   const handleUpload = async () => {
-    if (!selectedFile && !youtubeUrl) {
-      setError('動画ファイルまたはURLを入力してください')
+    if (!selectedFile) {
+      setError('動画ファイルを選択してください')
+      return
+    }
+
+    if (!session?.user) {
+      setError('アップロードを始めるにはログインが必要です')
+      redirectToSignIn()
       return
     }
 
@@ -63,37 +84,45 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: selectedFile?.name || 'YouTube Project',
+          name: selectedFile.name,
         }),
       })
 
+      const projectData = await readJsonSafely<{ error?: string; project?: { id?: string } }>(projectRes)
+
       if (!projectRes.ok) {
-        throw new Error('プロジェクトの作成に失敗しました')
+        if (projectRes.status === 401) {
+          redirectToSignIn()
+          throw new Error('アップロードを始めるにはログインが必要です')
+        }
+        throw new Error(projectData?.error || 'プロジェクトの作成に失敗しました')
       }
 
-      const project = await projectRes.json()
+      const project = projectData?.project
+      if (!project?.id) {
+        throw new Error('プロジェクトの作成結果が不正です')
+      }
       setUploadProgress(20)
 
-      // ファイルアップロード（動画ファイルまたはYouTube URLの場合）
+      // ファイルアップロード
       const formData = new FormData()
       formData.append('projectId', project.id)
-
-      if (selectedFile) {
-        formData.append('file', selectedFile)
-        formData.append('sourceType', 'upload')
-      } else if (youtubeUrl) {
-        formData.append('url', youtubeUrl)
-        formData.append('sourceType', 'youtube')
-      }
+      formData.append('file', selectedFile)
+      formData.append('sourceType', 'upload')
 
       const uploadRes = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
+      const uploadData = await readJsonSafely<{ error?: string }>(uploadRes)
+
       if (!uploadRes.ok) {
-        const errorData = await uploadRes.json().catch(() => ({}))
-        throw new Error(errorData.error || 'ファイルのアップロードに失敗しました')
+        if (uploadRes.status === 401) {
+          redirectToSignIn()
+          throw new Error('アップロードを始めるにはログインが必要です')
+        }
+        throw new Error(uploadData?.error || 'ファイルのアップロードに失敗しました')
       }
 
       setUploadProgress(60)
@@ -112,8 +141,7 @@ export default function HomePage() {
 
       setUploadProgress(80)
 
-      // 処理中画面へ遷移（YouTube URLの場合は非同期処理中）
-      // ファイルアップロードの場合も一旦processingへ
+      // 処理中画面へ遷移
       router.push(`/processing/${project.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラーが発生しました')
@@ -237,31 +265,6 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* URL Input */}
-        <div className="mt-6">
-          <div className="flex items-center gap-4 mb-3">
-            <div className="flex-1 h-px bg-[#f0e6df] dark:bg-[#3a2a20]" />
-            <span className="text-sm text-[#8a756b]">または</span>
-            <div className="flex-1 h-px bg-[#f0e6df] dark:bg-[#3a2a20]" />
-          </div>
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#8a756b]">
-              link
-            </span>
-            <input
-              type="url"
-              value={youtubeUrl}
-              onChange={(e) => {
-                setYoutubeUrl(e.target.value)
-                if (e.target.value) setSelectedFile(null)
-              }}
-              placeholder="YouTube / TikTok URLを入力"
-              className="w-full pl-12 pr-4 py-4 rounded-xl border border-[#f0e6df] dark:border-[#3a2a20] bg-white dark:bg-[#2a1d15] text-[#2d1f18] dark:text-white focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none"
-              data-test-id="landing-url-input"
-            />
-          </div>
-        </div>
-
         {/* Reference Video Section */}
         <div className="mt-8">
           <div className="flex items-center gap-2 mb-4">
@@ -309,7 +312,7 @@ export default function HomePage() {
         <div className="mt-8 text-center">
           <button
             onClick={handleUpload}
-            disabled={isUploading || (!selectedFile && !youtubeUrl)}
+            disabled={isUploading || !selectedFile}
             className="px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white font-bold text-lg rounded-xl shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             data-test-id="landing-start-editing-button"
           >
@@ -317,6 +320,11 @@ export default function HomePage() {
               <span className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[20px] animate-spin">sync</span>
                 処理中...
+              </span>
+            ) : !session?.user ? (
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined">login</span>
+                ログインして編集を開始
               </span>
             ) : (
               <span className="flex items-center gap-2">

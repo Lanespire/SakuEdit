@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { auth } from '@/lib/auth'
 import { writeFile, mkdir } from 'fs/promises'
@@ -13,6 +13,46 @@ const ALLOWED_TYPES = [
   'video/webm',
   'video/x-matroska',
 ]
+
+async function updateProjectProcessingError(projectId: string, message: string) {
+  await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      status: 'ERROR',
+      progressMessage: '処理の開始に失敗しました',
+      lastError: message,
+    },
+  })
+}
+
+function queueProcessing(
+  request: NextRequest,
+  projectId: string,
+  payload: Record<string, unknown>,
+) {
+  after(async () => {
+    try {
+      const response = await fetch(new URL('/api/process', request.url).toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const responseText = await response.text()
+        const errorMessage = responseText || `status ${response.status}`
+        console.error('Background processing startup failed:', errorMessage)
+        await updateProjectProcessingError(projectId, `Processing startup failed: ${errorMessage}`)
+      }
+    } catch (error) {
+      console.error('Background processing request failed:', error)
+      await updateProjectProcessingError(
+        projectId,
+        `Processing startup failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+  })
+}
 
 // POST /api/upload - Upload a video file
 export async function POST(request: NextRequest) {
@@ -36,7 +76,21 @@ export async function POST(request: NextRequest) {
       userId = session.user.id
     }
 
-    const formData = await request.formData()
+    let formData: FormData
+
+    try {
+      formData = await request.formData()
+    } catch (error) {
+      console.error('Failed to parse upload form data:', error)
+      return NextResponse.json(
+        {
+          error:
+            'アップロードデータを解析できませんでした。ファイルサイズまたは送信形式を確認してください。',
+        },
+        { status: 400 }
+      )
+    }
+
     const file = formData.get('file') as File | null
     const projectId = formData.get('projectId') as string | null
     const sourceType = (formData.get('sourceType') as string) || 'upload'
@@ -49,6 +103,15 @@ export async function POST(request: NextRequest) {
           { error: 'Project ID is required for URL uploads' },
           { status: 400 }
         )
+      }
+
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, userId },
+        select: { id: true },
+      })
+
+      if (!project) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 })
       }
 
       // Create project directory: uploads/projects/{projectId}/
@@ -69,13 +132,17 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Trigger async video download and processing
-      // In production, this would be a background job queue
-      fetch(new URL('/api/process', request.url).toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, sourceUrl: originalUrl }),
-      }).catch(err => console.error('Background processing failed:', err))
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          status: 'QUEUED',
+          progress: 0,
+          progressMessage: '処理キューに追加しました',
+          lastError: null,
+        },
+      })
+
+      queueProcessing(request, projectId, { projectId, sourceUrl: originalUrl })
 
       return NextResponse.json({ video, status: 'processing' }, { status: 202 })
     }
@@ -101,6 +168,15 @@ export async function POST(request: NextRequest) {
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
+    }
+
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId },
+      select: { id: true },
+    })
+
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
     // Create project directory structure: uploads/projects/{projectId}/
@@ -131,16 +207,15 @@ export async function POST(request: NextRequest) {
     // Update project status
     await prisma.project.update({
       where: { id: projectId },
-      data: { status: 'UPLOADING' },
+      data: {
+        status: 'QUEUED',
+        progress: 0,
+        progressMessage: '処理キューに追加しました',
+        lastError: null,
+      },
     })
 
-    // Trigger async video processing
-    // In production, this would be a background job queue
-    fetch(new URL('/api/process', request.url).toString(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId }),
-    }).catch(err => console.error('Background processing failed:', err))
+    queueProcessing(request, projectId, { projectId })
 
     return NextResponse.json({
       video,
@@ -150,7 +225,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error uploading video:', error)
     return NextResponse.json(
-      { error: 'Failed to upload video' },
+      { error: error instanceof Error ? error.message : 'Failed to upload video' },
       { status: 500 }
     )
   }

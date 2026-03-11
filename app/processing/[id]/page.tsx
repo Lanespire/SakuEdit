@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 interface ProcessingStep {
@@ -23,6 +23,7 @@ interface ProjectData {
   status: string
   progress: number
   progressMessage: string
+  lastError?: string | null
   videos: Array<{
     id: string
     filename: string
@@ -51,7 +52,54 @@ export default function ProcessingPage() {
   const [isError, setIsError] = useState(false)
   const [error, setError] = useState('')
 
-  const animationTypes = ['FadeIn', 'Bounce', 'Slide', 'Plain', 'Pop']
+  const updateStepStatuses = useCallback((progress: number, status: string, message?: string) => {
+    setSteps((prev) => {
+      const completedStepIndex = Math.floor(progress / 20) // 5 steps, each 20%
+
+      return prev.map((step, index) => {
+        if (status === 'ERROR') {
+          return { ...step, status: 'pending' }
+        }
+
+        if (status === 'COMPLETED') {
+          return { ...step, status: 'completed' }
+        }
+
+        if (index < completedStepIndex) {
+          return { ...step, status: 'completed' }
+        }
+
+        if (index === completedStepIndex) {
+          return { ...step, status: 'processing' }
+        }
+
+        return { ...step, status: 'pending' }
+      })
+    })
+
+    if (message && progress > 0) {
+      setLogs((prev) => {
+        const lastLog = prev[prev.length - 1]
+        if (lastLog?.text === message) {
+          return prev
+        }
+
+        const animationTypes = ['FadeIn', 'Bounce', 'Slide', 'Plain', 'Pop']
+        const newLog: LogEntry = {
+          id: Date.now().toString(),
+          timestamp: new Date().toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+          animation: animationTypes[Math.floor(Math.random() * animationTypes.length)],
+          text: message,
+        }
+
+        return [...prev.slice(-4), newLog]
+      })
+    }
+  }, [])
 
   // Fetch project progress
   useEffect(() => {
@@ -83,7 +131,7 @@ export default function ProcessingPage() {
         // Handle error
         if (project.status === 'ERROR') {
           setIsError(true)
-          setError(project.progressMessage || '処理中にエラーが発生しました')
+          setError(project.lastError || project.progressMessage || '処理中にエラーが発生しました')
           return
         }
       } catch (err) {
@@ -97,43 +145,7 @@ export default function ProcessingPage() {
     const interval = setInterval(fetchProgress, 2000)
 
     return () => clearInterval(interval)
-  }, [_projectId, router])
-
-  // Update step statuses based on progress
-  const updateStepStatuses = (progress: number, status: string, message?: string) => {
-    const newSteps = [...steps]
-    const completedStepIndex = Math.floor(progress / 20) // 5 steps, each 20%
-
-    newSteps.forEach((step, index) => {
-      if (status === 'ERROR') {
-        step.status = 'pending'
-      } else if (status === 'COMPLETED') {
-        step.status = 'completed'
-      } else if (index < completedStepIndex) {
-        step.status = 'completed'
-      } else if (index === completedStepIndex) {
-        step.status = 'processing'
-      } else {
-        step.status = 'pending'
-      }
-    })
-
-    setSteps(newSteps)
-
-    // Add log entries based on progress and message
-    if (message && progress > 0) {
-      const lastLog = logs[logs.length - 1]
-      if (!lastLog || lastLog.text !== message) {
-        const newLog: LogEntry = {
-          id: Date.now().toString(),
-          timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          animation: animationTypes[Math.floor(Math.random() * animationTypes.length)],
-          text: message,
-        }
-        setLogs((prev) => [...prev.slice(-4), newLog])
-      }
-    }
-  }
+  }, [_projectId, router, updateStepStatuses])
 
   const handleCancel = () => {
     router.push('/home')

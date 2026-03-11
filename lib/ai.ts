@@ -35,7 +35,27 @@ const DEFAULT_MODEL = MODELS.geminiFlash
 // Model for logged-in/paid users
 const PREMIUM_MODEL = MODELS.geminiFlashPaid
 
-const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
+function sanitizeApiKey(value?: string): string | undefined {
+  const trimmed = value?.trim()
+  if (!trimmed) return undefined
+
+  const normalized = trimmed.toLowerCase()
+  if (
+    normalized === 'deepgram_api_key' ||
+    normalized === 'your_deepgram_api_key_here' ||
+    normalized.includes('replace_me')
+  ) {
+    return undefined
+  }
+
+  return trimmed
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+const DEEPGRAM_API_KEY = sanitizeApiKey(process.env.DEEPGRAM_API_KEY)
 const DEEPGRAM_MODEL = process.env.DEEPGRAM_MODEL || 'nova-3'
 
 const deepgram = DEEPGRAM_API_KEY
@@ -393,7 +413,20 @@ export async function transcribeAudio(
   }
 
   if (DEEPGRAM_API_KEY) {
-    return transcribeWithDeepgram(audioPath, language)
+    try {
+      return await transcribeWithDeepgram(audioPath, language)
+    } catch (error) {
+      const deepgramError = getErrorMessage(error)
+      console.warn(`Deepgram transcription failed, falling back to local whisper: ${deepgramError}`)
+
+      try {
+        return await transcribeWithLocalWhisper(audioPath, language)
+      } catch (fallbackError) {
+        throw new Error(
+          `Deepgram transcription failed (${deepgramError}); local whisper fallback also failed: ${getErrorMessage(fallbackError)}`
+        )
+      }
+    }
   }
 
   return transcribeWithLocalWhisper(audioPath, language)
