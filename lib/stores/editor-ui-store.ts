@@ -125,6 +125,22 @@ const createSnapshot = (state: EditorUiState): EditorSnapshot => ({
   playbackRate: state.playbackRate,
 })
 
+function withHistoryState(
+  state: EditorUiState,
+  nextState: Partial<EditorUiState>,
+  pushToHistory: boolean,
+) {
+  if (!pushToHistory) {
+    return nextState
+  }
+
+  return {
+    ...nextState,
+    undoStack: [...state.undoStack, createSnapshot(state)],
+    redoStack: [],
+  }
+}
+
 function findSubtitleIndex(subtitles: Subtitle[], subtitleId: string | null) {
   if (!subtitleId) {
     return 0
@@ -136,54 +152,62 @@ function findSubtitleIndex(subtitles: Subtitle[], subtitleId: string | null) {
   )
 }
 
-export const useEditorUiStore = create<EditorUiState>((set, get) => ({
-  activeTab: 'ai',
-  isPlaying: false,
-  playbackRate: 1,
-  isSubtitleModalOpen: false,
-  isExportModalOpen: false,
-  selectedSubtitleIndex: 0,
-  selectedSubtitleId: null,
-  selectedTrack: 'video',
-  selectedSuggestionId: null,
+export const useEditorUiStore = create<EditorUiState>((set, get) => {
+  const setWithHistory = (
+    updater: (state: EditorUiState) => Partial<EditorUiState>,
+    pushToHistory = true,
+  ) => {
+    set((state) => withHistoryState(state, updater(state), pushToHistory))
+  }
 
-  undoStack: [],
-  redoStack: [],
+  return {
+    activeTab: 'ai',
+    isPlaying: false,
+    playbackRate: 1,
+    isSubtitleModalOpen: false,
+    isExportModalOpen: false,
+    selectedSubtitleIndex: 0,
+    selectedSubtitleId: null,
+    selectedTrack: 'video',
+    selectedSuggestionId: null,
 
-  isSaving: false,
-  lastSavedAt: null,
+    undoStack: [],
+    redoStack: [],
 
-  projectName: '',
-  isEditingName: false,
-  durationSeconds: 0,
-  playheadSeconds: 0,
-  zoomLevel: 1,
-  scrollPosition: 0,
-  cutApplied: false,
-  video: null,
-  subtitles: [],
-  aiSuggestions: [],
-  markers: [],
-  chatMessages: [],
+    isSaving: false,
+    lastSavedAt: null,
 
-  hydrateProject: (payload) =>
-    set({
-      projectName: payload.projectName,
-      video: payload.video,
-      subtitles: sortSubtitles(payload.subtitles),
-      aiSuggestions: payload.aiSuggestions,
-      markers: payload.markers,
-      durationSeconds: payload.durationSeconds,
-      playheadSeconds: payload.playheadSeconds,
-      zoomLevel: payload.zoomLevel,
-      scrollPosition: payload.scrollPosition,
-      cutApplied: payload.cutApplied,
-      chatMessages: payload.chatMessages ?? [],
-      selectedSubtitleIndex: 0,
-      selectedSubtitleId: payload.subtitles[0]?.id ?? null,
-      undoStack: [],
-      redoStack: [],
-    }),
+    projectName: '',
+    isEditingName: false,
+    durationSeconds: 0,
+    playheadSeconds: 0,
+    zoomLevel: 1,
+    scrollPosition: 0,
+    cutApplied: false,
+    video: null,
+    subtitles: [],
+    aiSuggestions: [],
+    markers: [],
+    chatMessages: [],
+
+    hydrateProject: (payload) =>
+      set({
+        projectName: payload.projectName,
+        video: payload.video,
+        subtitles: sortSubtitles(payload.subtitles),
+        aiSuggestions: payload.aiSuggestions,
+        markers: payload.markers,
+        durationSeconds: payload.durationSeconds,
+        playheadSeconds: payload.playheadSeconds,
+        zoomLevel: payload.zoomLevel,
+        scrollPosition: payload.scrollPosition,
+        cutApplied: payload.cutApplied,
+        chatMessages: payload.chatMessages ?? [],
+        selectedSubtitleIndex: 0,
+        selectedSubtitleId: payload.subtitles[0]?.id ?? null,
+        undoStack: [],
+        redoStack: [],
+      }),
 
   setActiveTab: (activeTab) => set({ activeTab }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -193,15 +217,7 @@ export const useEditorUiStore = create<EditorUiState>((set, get) => ({
   setZoomLevel: (zoomLevel) => set({ zoomLevel }),
   setScrollPosition: (scrollPosition) => set({ scrollPosition }),
   setCutApplied: (cutApplied, pushToHistory = true) =>
-    set((state) => ({
-      ...(pushToHistory
-        ? {
-            undoStack: [...state.undoStack, createSnapshot(state)],
-            redoStack: [],
-          }
-        : {}),
-      cutApplied,
-    })),
+    setWithHistory(() => ({ cutApplied }), pushToHistory),
   setSelectedTrack: (selectedTrack) => set({ selectedTrack }),
   setSelectedSuggestionId: (selectedSuggestionId) => set({ selectedSuggestionId }),
   selectSubtitleById: (selectedSubtitleId) =>
@@ -301,7 +317,7 @@ export const useEditorUiStore = create<EditorUiState>((set, get) => ({
   setProjectName: (projectName) => set({ projectName }),
   setEditingName: (isEditingName) => set({ isEditingName }),
   replaceSubtitles: (subtitles, pushToHistory = true) =>
-    set((state) => {
+    setWithHistory((state) => {
       const sorted = sortSubtitles(subtitles)
       const selectedSubtitleId =
         sorted.find((subtitle) => subtitle.id === state.selectedSubtitleId)?.id ??
@@ -309,19 +325,13 @@ export const useEditorUiStore = create<EditorUiState>((set, get) => ({
         null
 
       return {
-        ...(pushToHistory
-          ? {
-              undoStack: [...state.undoStack, createSnapshot(state)],
-              redoStack: [],
-            }
-          : {}),
         subtitles: sorted,
         selectedSubtitleId,
         selectedSubtitleIndex: findSubtitleIndex(sorted, selectedSubtitleId),
       }
-    }),
+    }, pushToHistory),
   upsertSubtitle: (subtitle, pushToHistory = true) =>
-    set((state) => {
+    setWithHistory((state) => {
       const existingIndex = state.subtitles.findIndex((item) => item.id === subtitle.id)
       const subtitles =
         existingIndex >= 0
@@ -330,19 +340,13 @@ export const useEditorUiStore = create<EditorUiState>((set, get) => ({
       const sorted = sortSubtitles(subtitles)
 
       return {
-        ...(pushToHistory
-          ? {
-              undoStack: [...state.undoStack, createSnapshot(state)],
-              redoStack: [],
-            }
-          : {}),
         subtitles: sorted,
         selectedSubtitleId: subtitle.id,
         selectedSubtitleIndex: findSubtitleIndex(sorted, subtitle.id),
       }
-    }),
+    }, pushToHistory),
   deleteSubtitle: (id, pushToHistory = true) =>
-    set((state) => {
+    setWithHistory((state) => {
       const subtitles = state.subtitles.filter((subtitle) => subtitle.id !== id)
       const selectedSubtitleId =
         state.selectedSubtitleId === id
@@ -350,54 +354,31 @@ export const useEditorUiStore = create<EditorUiState>((set, get) => ({
           : state.selectedSubtitleId
 
       return {
-        ...(pushToHistory
-          ? {
-              undoStack: [...state.undoStack, createSnapshot(state)],
-              redoStack: [],
-            }
-          : {}),
         subtitles,
         selectedSubtitleId,
         selectedSubtitleIndex: findSubtitleIndex(subtitles, selectedSubtitleId),
       }
-    }),
-  replaceAiSuggestions: (aiSuggestions, pushToHistory = true) =>
-    set((state) => ({
-      ...(pushToHistory
-        ? {
-            undoStack: [...state.undoStack, createSnapshot(state)],
-            redoStack: [],
-          }
-        : {}),
-      aiSuggestions,
-    })),
-  markSuggestionApplied: (id, isApplied, pushToHistory = true) =>
-    set((state) => ({
-      ...(pushToHistory
-        ? {
-            undoStack: [...state.undoStack, createSnapshot(state)],
-            redoStack: [],
-          }
-        : {}),
-      aiSuggestions: state.aiSuggestions.map((suggestion) =>
-        suggestion.id === id ? { ...suggestion, isApplied } : suggestion,
-      ),
-      selectedSuggestionId: id,
-    })),
-  replaceMarkers: (markers, pushToHistory = true) =>
-    set((state) => ({
-      ...(pushToHistory
-        ? {
-            undoStack: [...state.undoStack, createSnapshot(state)],
-            redoStack: [],
-          }
-        : {}),
-      markers,
-    })),
-  setVideo: (video) => set({ video }),
-  replaceChatMessages: (chatMessages) => set({ chatMessages }),
-  appendChatMessage: (message) =>
-    set((state) => ({
-      chatMessages: [...state.chatMessages, message],
-    })),
-}))
+    }, pushToHistory),
+    replaceAiSuggestions: (aiSuggestions, pushToHistory = true) =>
+      setWithHistory(() => ({
+        aiSuggestions,
+      }), pushToHistory),
+    markSuggestionApplied: (id, isApplied, pushToHistory = true) =>
+      setWithHistory((state) => ({
+        aiSuggestions: state.aiSuggestions.map((suggestion) =>
+          suggestion.id === id ? { ...suggestion, isApplied } : suggestion,
+        ),
+        selectedSuggestionId: id,
+      }), pushToHistory),
+    replaceMarkers: (markers, pushToHistory = true) =>
+      setWithHistory(() => ({
+        markers,
+      }), pushToHistory),
+    setVideo: (video) => set({ video }),
+    replaceChatMessages: (chatMessages) => set({ chatMessages }),
+    appendChatMessage: (message) =>
+      set((state) => ({
+        chatMessages: [...state.chatMessages, message],
+      })),
+  }
+})
