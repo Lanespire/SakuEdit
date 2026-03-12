@@ -11,13 +11,13 @@ import {
 import prisma from '@/lib/db'
 import { getPlaybackSegments, normalizeSilenceRegions } from '@/lib/editor'
 import type { ExportQuality, SubtitleExportOption } from '@/lib/plans'
+import { serializeSegmentsToSrt } from '@/lib/remotion-captions-adapter'
 import {
   createVideoBucketSignedGetUrl,
   uploadFileToVideoBucket,
   uploadTextToVideoBucket,
 } from '@/lib/server/video-bucket'
 import {
-  generateSRTContent,
   generateThumbnail,
   renderWithRemotion,
 } from '@/lib/video-processor'
@@ -237,7 +237,13 @@ export async function POST(request: NextRequest) {
       let srtKey: string | null = null
       if ((subtitleOption === 'srt' || subtitleOption === 'both') && subtitles.length > 0) {
         srtKey = buildExportObjectKey(projectId, exportJob.id, 'subtitles.srt')
-        await uploadTextToVideoBucket(srtKey, generateSRTContent(subtitles), {
+        await uploadTextToVideoBucket(srtKey, serializeSegmentsToSrt(
+          subtitles.map((subtitle) => ({
+            start: subtitle.startTime,
+            end: subtitle.endTime,
+            text: subtitle.text,
+          })),
+        ), {
           contentType: 'text/plain; charset=utf-8',
         })
       }

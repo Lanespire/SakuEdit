@@ -12,6 +12,7 @@ import type { VideoStyleSample } from './video-processor'
 import {
   serializeSegmentsToSrt,
   shapeCaptionSegments,
+  type TimedTextSegment,
 } from './remotion-captions-adapter'
 import { transcribeWithRemotionWhisper } from './remotion-whisper-adapter'
 
@@ -178,10 +179,7 @@ interface LocalWhisperResponse {
 
 interface ASRResult {
   text: string
-  segments: Array<{
-    start: number
-    end: number
-    text: string
+  segments: Array<TimedTextSegment & {
     speaker?: string
   }>
 }
@@ -473,10 +471,10 @@ async function transcribeWithLocalWhisper(audioPath: string, language: string): 
 // ============================================
 export async function generateSubtitles(
   transcript: string,
-  segments: Array<{ start: number; end: number; text: string }>,
+  segments: TimedTextSegment[],
   style: StyleAnalysisResult['subtitleSettings'],
   isPremium: boolean = false
-): Promise<Array<{ start: number; end: number; text: string }>> {
+): Promise<TimedTextSegment[]> {
   if (segments && segments.length > 0) {
     return shapeCaptionSegments(segments, {
       combineTokensWithinMilliseconds: 1200,
@@ -528,7 +526,7 @@ Style: ${JSON.stringify(style)}`
 // ============================================
 // SRT Generation
 // ============================================
-export function generateSRT(subtitles: Array<{ start: number; end: number; text: string }>): string {
+export function generateSRT(subtitles: TimedTextSegment[]): string {
   return serializeSegmentsToSrt(subtitles)
 }
 

@@ -10,6 +10,7 @@ import {
   getMediaDurationWithMediabunny,
   getMediaMetadataWithMediabunny,
 } from './mediabunny-adapter'
+import { serializeSegmentsToSrt } from './remotion-captions-adapter'
 
 // プロジェクトベースのパスユーティリティ
 export function getProjectPath(projectId: string, filename?: string): string {
@@ -1118,19 +1119,13 @@ export function generateSRTContent(
     endTime: number
   }>
 ): string {
-  return subtitles.map((sub, index) => {
-    const formatTime = (seconds: number): string => {
-      const hours = Math.floor(seconds / 3600)
-      const minutes = Math.floor((seconds % 3600) / 60)
-      const secs = Math.floor(seconds % 60)
-      const ms = Math.floor((seconds % 1) * 1000)
-      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`
-    }
-
-    return `${index + 1}
-${formatTime(sub.startTime)} --> ${formatTime(sub.endTime)}
-${sub.text}`
-  }).join('\n\n')
+  return serializeSegmentsToSrt(
+    subtitles.map((subtitle) => ({
+      start: subtitle.startTime,
+      end: subtitle.endTime,
+      text: subtitle.text,
+    })),
+  )
 }
 
 /**
