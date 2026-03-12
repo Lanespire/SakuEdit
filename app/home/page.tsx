@@ -152,7 +152,7 @@ export default function HomePage() {
             新しいプロジェクト
           </h1>
           <p className="text-[#8a756b] text-lg">
-            動画をアップロードして、AIで自動編集を始めましょう
+            動画をアップロードして、チャットベースの AI 編集を始めましょう
           </p>
         </div>
 
@@ -297,9 +297,9 @@ export default function HomePage() {
         {/* Quick Start Guide */}
         <div className="mt-16 grid md:grid-cols-3 gap-6">
           {[
-            { num: '1', title: '動画アップロード', desc: '編集したい素材動画を選択', icon: 'upload' },
-            { num: '2', title: 'スタイル選択', desc: '好きなクリエイターのスタイルを学習', icon: 'palette' },
-            { num: '3', title: 'AI自動編集', desc: '学習したスタイルで自動編集完了', icon: 'auto_awesome' },
+            { num: '1', title: '素材をアップロード', desc: '編集したい動画を読み込む', icon: 'upload' },
+            { num: '2', title: 'AIに指示', desc: 'スタイルやカット方針を自然文で指定', icon: 'forum' },
+            { num: '3', title: '結果を書き出し', desc: '調整後の動画をそのまま保存', icon: 'download' },
           ].map((step) => (
             <div key={step.num} className="text-center p-6 bg-white dark:bg-[#2a1d15] rounded-xl border border-[#f0e6df] dark:border-[#3a2a20]">
               <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto mb-4">

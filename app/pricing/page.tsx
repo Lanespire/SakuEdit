@@ -240,7 +240,21 @@ export default async function PricingPage({
       </section>
 
       <footer className="py-8 px-4 border-t border-[#f0e6df] dark:border-[#3a2a20]">
-        <div className="max-w-7xl mx-auto text-center">
+        <div className="max-w-7xl mx-auto flex flex-col items-center gap-3 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-[#8a756b]">
+            <Link href="/terms" className="hover:text-[#2d1f18] dark:hover:text-white">
+              利用規約
+            </Link>
+            <Link href="/privacy" className="hover:text-[#2d1f18] dark:hover:text-white">
+              プライバシーポリシー
+            </Link>
+            <Link
+              href="/commercial-transactions"
+              className="hover:text-[#2d1f18] dark:hover:text-white"
+            >
+              特定商取引法に基づく表記
+            </Link>
+          </div>
           <p className="text-sm text-[#8a756b]">© 2026 SakuEdit. All rights reserved.</p>
         </div>
       </footer>

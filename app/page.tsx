@@ -473,7 +473,23 @@ export default function LandingPage() {
               </div>
               <span className="font-bold text-lg">{SERVICE_NAME}</span>
             </div>
-            <div className="text-muted text-sm">
+
+            <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-muted">
+              <Link href="/terms" className="hover:text-foreground transition-colors">
+                利用規約
+              </Link>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
+                プライバシーポリシー
+              </Link>
+              <Link
+                href="/commercial-transactions"
+                className="hover:text-foreground transition-colors"
+              >
+                特定商取引法に基づく表記
+              </Link>
+            </div>
+
+            <div className="text-muted text-sm text-center">
               © 2026 {SERVICE_NAME}. All rights reserved.
             </div>
           </div>

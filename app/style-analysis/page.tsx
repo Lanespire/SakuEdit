@@ -87,7 +87,7 @@ function StyleAnalysisContent() {
         setCompleted(true)
 
         if (projectId) {
-          await startProjectProcessing(result.projectId)
+          await startProjectProcessing(result.projectId, { reuseExistingSubtitles: true })
           router.replace(`/processing/${result.projectId}`)
           return
         }

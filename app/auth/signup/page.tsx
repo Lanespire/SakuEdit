@@ -155,6 +155,10 @@ function SignUpPageContent() {
             <Link href="/terms" className="text-primary hover:underline">利用規約</Link>
             {' '}と{' '}
             <Link href="/privacy" className="text-primary hover:underline">プライバシーポリシー</Link>
+            {' '}ならびに{' '}
+            <Link href="/commercial-transactions" className="text-primary hover:underline">
+              特定商取引法に基づく表記
+            </Link>
             に同意したものとみなされます。
           </p>
 

@@ -259,7 +259,7 @@ function StylesPageContent() {
 
     try {
       await postJson('/api/styles/preset', { projectId, presetId })
-      await startProjectProcessing(projectId)
+      await startProjectProcessing(projectId, { reuseExistingSubtitles: true })
       router.push(`/processing/${projectId}`)
     } catch (applyError) {
       setError(applyError instanceof Error ? applyError.message : 'スタイル適用に失敗しました')
@@ -279,7 +279,7 @@ function StylesPageContent() {
 
     try {
       await applyProjectStyle(styleId)
-      await startProjectProcessing(projectId)
+      await startProjectProcessing(projectId, { reuseExistingSubtitles: true })
       router.push(`/processing/${projectId}`)
     } catch (applyError) {
       setError(applyError instanceof Error ? applyError.message : 'スタイル適用に失敗しました')
