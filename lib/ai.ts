@@ -1,16 +1,19 @@
 /**
  * AI Client for SakuEdit
  * Uses OpenRouter + AI SDK with Gemini Flash for cost-effective processing
- * Deepgram Nova-3 for ASR (speech-to-text) with local whisper fallback
+ * Remotion Whisper + captions helpers for ASR (speech-to-text)
  */
 
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText, streamText, generateObject } from 'ai'
 import { z } from 'zod'
-import { createReadStream } from 'fs'
-import { DeepgramClient } from '@deepgram/sdk'
 import fs from 'fs/promises'
 import type { VideoStyleSample } from './video-processor'
+import {
+  serializeSegmentsToSrt,
+  shapeCaptionSegments,
+} from './remotion-captions-adapter'
+import { transcribeWithRemotionWhisper } from './remotion-whisper-adapter'
 
 // ============================================
 // OpenRouter + Gemini Flash Configuration
@@ -35,32 +38,9 @@ const DEFAULT_MODEL = MODELS.geminiFlashLite
 // Model for logged-in/paid users
 const PREMIUM_MODEL = MODELS.geminiFlash
 
-function sanitizeApiKey(value?: string): string | undefined {
-  const trimmed = value?.trim()
-  if (!trimmed) return undefined
-
-  const normalized = trimmed.toLowerCase()
-  if (
-    normalized === 'deepgram_api_key' ||
-    normalized === 'your_deepgram_api_key_here' ||
-    normalized.includes('replace_me')
-  ) {
-    return undefined
-  }
-
-  return trimmed
-}
-
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
-
-const DEEPGRAM_API_KEY = sanitizeApiKey(process.env.DEEPGRAM_API_KEY)
-const DEEPGRAM_MODEL = process.env.DEEPGRAM_MODEL || 'nova-3'
-
-const deepgram = DEEPGRAM_API_KEY
-  ? new DeepgramClient({ apiKey: DEEPGRAM_API_KEY })
-  : null
 
 // ============================================
 // Style Analysis Schema (Zod)
@@ -400,7 +380,7 @@ Rules:
 }
 
 // ============================================
-// Audio Transcription (Deepgram primary, local whisper fallback)
+// Audio Transcription (Remotion Whisper primary, local whisper fallback)
 // ============================================
 export async function transcribeAudio(
   audioPath: string,
@@ -412,103 +392,25 @@ export async function transcribeAudio(
     throw new Error(`Audio file not found: ${audioPath}`)
   }
 
-  if (DEEPGRAM_API_KEY) {
+  try {
+    const result = await transcribeWithRemotionWhisper(audioPath, language)
+    return {
+      text: result.text,
+      segments: result.segments,
+    }
+  } catch (error) {
+    const remotionError = getErrorMessage(error)
+    console.warn(
+      `Remotion whisper transcription failed, falling back to local whisper: ${remotionError}`
+    )
+
     try {
-      return await transcribeWithDeepgram(audioPath, language)
-    } catch (error) {
-      const deepgramError = getErrorMessage(error)
-      console.warn(`Deepgram transcription failed, falling back to local whisper: ${deepgramError}`)
-
-      try {
-        return await transcribeWithLocalWhisper(audioPath, language)
-      } catch (fallbackError) {
-        throw new Error(
-          `Deepgram transcription failed (${deepgramError}); local whisper fallback also failed: ${getErrorMessage(fallbackError)}`
-        )
-      }
+      return await transcribeWithLocalWhisper(audioPath, language)
+    } catch (fallbackError) {
+      throw new Error(
+        `Remotion whisper transcription failed (${remotionError}); local whisper fallback also failed: ${getErrorMessage(fallbackError)}`
+      )
     }
-  }
-
-  return transcribeWithLocalWhisper(audioPath, language)
-}
-
-async function transcribeWithDeepgram(audioPath: string, language: string): Promise<ASRResult> {
-  if (!deepgram) {
-    throw new Error('Deepgram client is not configured')
-  }
-
-  const response = await deepgram.listen.v1.media.transcribeFile(
-    createReadStream(audioPath),
-    {
-      model: DEEPGRAM_MODEL,
-      language,
-      smart_format: true,
-      punctuate: true,
-      paragraphs: true,
-      utterances: true,
-    }
-  )
-
-  if (!('results' in response) || !response.results) {
-    throw new Error('Deepgram transcription did not return transcript results')
-  }
-
-  const transcript =
-    response.results.channels?.[0]?.alternatives?.[0]?.transcript?.trim() || ''
-
-  const utteranceSegments = response.results.utterances
-    ?.map((utterance) => ({
-      start: utterance.start ?? 0,
-      end: utterance.end ?? utterance.start ?? 0,
-      text: utterance.transcript?.trim() || '',
-      speaker:
-        utterance.speaker !== undefined ? String(utterance.speaker) : undefined,
-    }))
-    .filter((segment) => segment.text.length > 0)
-
-  if (utteranceSegments && utteranceSegments.length > 0) {
-    return {
-      text: transcript,
-      segments: utteranceSegments,
-    }
-  }
-
-  const words = response.results.channels?.[0]?.alternatives?.[0]?.words || []
-  if (words.length > 0) {
-    const start = words[0]?.start ?? 0
-    const end = words[words.length - 1]?.end ?? start
-    // Japanese text should not have spaces between words
-    const separator = /^(ja|zh|ko)/.test(language) ? '' : ' '
-    const text = words
-      .map((word) => word.word || '')
-      .join(separator)
-      .trim()
-
-    return {
-      text: transcript || text,
-      segments: text
-        ? [
-            {
-              start,
-              end,
-              text,
-            },
-          ]
-        : [],
-    }
-  }
-
-  return {
-    text: transcript,
-    segments: transcript
-      ? [
-          {
-            start: 0,
-            end: 0,
-            text: transcript,
-          },
-        ]
-      : [],
   }
 }
 
@@ -576,7 +478,10 @@ export async function generateSubtitles(
   isPremium: boolean = false
 ): Promise<Array<{ start: number; end: number; text: string }>> {
   if (segments && segments.length > 0) {
-    return segments
+    return shapeCaptionSegments(segments, {
+      combineTokensWithinMilliseconds: 1200,
+      maxCharsPerLine: style.position === 'middle' ? 18 : 16,
+    })
   }
 
   if (!transcript || transcript.trim().length === 0) {
@@ -624,22 +529,7 @@ Style: ${JSON.stringify(style)}`
 // SRT Generation
 // ============================================
 export function generateSRT(subtitles: Array<{ start: number; end: number; text: string }>): string {
-  return subtitles
-    .map((sub, index) => {
-      const start = formatSRTTime(sub.start)
-      const end = formatSRTTime(sub.end)
-      return `${index + 1}\n${start} --> ${end}\n${sub.text}\n`
-    })
-    .join('\n')
-}
-
-function formatSRTTime(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
-  const millis = Math.floor((seconds % 1) * 1000)
-
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(millis).padStart(3, '0')}`
+  return serializeSegmentsToSrt(subtitles)
 }
 
 // ============================================

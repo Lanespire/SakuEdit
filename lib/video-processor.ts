@@ -1,6 +1,12 @@
 import { spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import * as path from 'path'
+import {
+  generateThumbnailWithMediabunny,
+  generateWaveformWithMediabunny,
+  getMediaDurationWithMediabunny,
+  getMediaMetadataWithMediabunny,
+} from './mediabunny-adapter'
 
 // プロジェクトベースのパスユーティリティ
 export function getProjectPath(projectId: string, filename?: string): string {
@@ -158,6 +164,12 @@ export async function detectSilence(
  * 動画の長さを取得
  */
 export async function getVideoDuration(inputPath: string): Promise<number> {
+  try {
+    return await getMediaDurationWithMediabunny(inputPath)
+  } catch {
+    // Fall back to ffprobe when Mediabunny cannot read this asset in the current runtime.
+  }
+
   return new Promise((resolve, reject) => {
     const args = [
       '-i', inputPath,
@@ -212,7 +224,7 @@ export async function downloadFromYouTube(
 
     let stderrOutput = ''
 
-    ytDlp.stdout.on('data', (data) => {
+    ytDlp.stdout.on('data', () => {
       // 進捗情報（必要に応じて処理）
     })
 
@@ -307,6 +319,12 @@ export async function extractAudio(
  * 動画のメタデータを取得（詳細）
  */
 export async function getVideoMetadata(inputPath: string): Promise<VideoMetadata> {
+  try {
+    return await getMediaMetadataWithMediabunny(inputPath)
+  } catch {
+    // Fall back to ffprobe when richer decoding support is unavailable in Node.
+  }
+
   return new Promise((resolve, reject) => {
     const args = [
       '-v', 'quiet',
@@ -676,6 +694,15 @@ export async function generateThumbnail(
   width: number = 1280,
   height: number = 720
 ): Promise<{ success: boolean; outputPath?: string; error?: string }> {
+  try {
+    const generated = await generateThumbnailWithMediabunny(inputPath, outputPath, timestamp)
+    if (generated) {
+      return { success: true, outputPath }
+    }
+  } catch {
+    // Fall back to FFmpeg until canvas decoding is available in the runtime.
+  }
+
   return new Promise((resolve) => {
     const args = [
       '-ss', timestamp.toString(),
@@ -728,8 +755,6 @@ export async function processVideo(
     subtitles = [],
     quality = '1080p',
     // format and watermark are reserved for future use
-    format: _format = 'mp4',
-    watermark: _watermark = false,
   } = options
 
   try {
@@ -834,6 +859,7 @@ export async function renderWithRemotion(
     const args = [
       'remotion',
       'render',
+      'remotion/index.ts',
       compositionId,
       outputPath,
       '--props', JSON.stringify(inputProps)
@@ -879,7 +905,6 @@ export async function exportVideo(
 ): Promise<{ success: boolean; outputPath?: string; error?: string }> {
   const {
     quality = '720p',
-    format = 'mp4',
     subtitles = [],
     burnSubtitles = false,
   } = options
@@ -980,6 +1005,15 @@ export async function generateWaveformData(
   inputPath: string,
   samples: number = 100
 ): Promise<{ success: boolean; data?: number[]; error?: string }> {
+  try {
+    const data = await generateWaveformWithMediabunny(inputPath, samples)
+    if (data && data.length > 0) {
+      return { success: true, data }
+    }
+  } catch {
+    // Fall back to FFmpeg while audio decoding APIs are unavailable in Node.
+  }
+
   return new Promise((resolve) => {
     // Use FFmpeg's astats filter to get audio levels at regular intervals
     // We extract RMS levels at regular intervals across the audio
@@ -992,15 +1026,11 @@ export async function generateWaveformData(
 
     const ffmpeg = spawn('ffmpeg', args)
     let stdout = ''
-    let stderrOutput = ''
-
     ffmpeg.stdout.on('data', (data) => {
       stdout += data.toString()
     })
 
-    ffmpeg.stderr.on('data', (data) => {
-      stderrOutput += data.toString()
-    })
+    ffmpeg.stderr.on('data', () => undefined)
 
     ffmpeg.on('close', (code) => {
       if (code === 0 || stdout.length > 0) {
@@ -1030,7 +1060,7 @@ export async function generateWaveformData(
             // Fallback: generate simulated waveform based on silence detection
             resolve({ success: true, data: generateSimulatedWaveform(samples) })
           }
-        } catch (parseError) {
+        } catch {
           // Fallback to simulated waveform
           resolve({ success: true, data: generateSimulatedWaveform(samples) })
         }
@@ -1040,7 +1070,7 @@ export async function generateWaveformData(
       }
     })
 
-    ffmpeg.on('error', (err) => {
+    ffmpeg.on('error', () => {
       // Return simulated waveform instead of error
       resolve({ success: true, data: generateSimulatedWaveform(samples) })
     })
