@@ -1,6 +1,9 @@
+import { createServer } from 'http'
+import { type AddressInfo } from 'net'
 import { spawn } from 'child_process'
-import { promises as fs } from 'fs'
+import { createReadStream, promises as fs } from 'fs'
 import * as path from 'path'
+import { getPlaybackSegments, type PlaybackSegment } from './editor'
 import {
   generateThumbnailWithMediabunny,
   generateWaveformWithMediabunny,
@@ -28,6 +31,8 @@ export interface VideoProcessOptions {
   outputPath: string
   silenceThreshold?: number
   silenceDuration?: number
+  silenceRegions?: SilenceDetection[]
+  playbackSegments?: PlaybackSegment[]
   subtitles?: Array<{
     text: string
     startTime: number
@@ -50,6 +55,7 @@ export interface ProcessingResult {
   outputPath?: string
   error?: string
   silenceRegions?: SilenceDetection[]
+  playbackSegments?: PlaybackSegment[]
   duration?: number
 }
 
@@ -105,6 +111,140 @@ export interface DownloadResult {
   inputPath?: string
   metadata?: VideoMetadata
   error?: string
+}
+
+function inferContentTypeFromPath(filePath: string) {
+  switch (path.extname(filePath).toLowerCase()) {
+    case '.mp4':
+      return 'video/mp4'
+    case '.mov':
+      return 'video/quicktime'
+    case '.webm':
+      return 'video/webm'
+    case '.m4a':
+      return 'audio/mp4'
+    case '.mp3':
+      return 'audio/mpeg'
+    case '.wav':
+      return 'audio/wav'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+function toTimelineSilenceRegions(silenceRegions: SilenceDetection[]) {
+  return silenceRegions.map((region) => ({
+    start: region.startTime,
+    end: region.endTime,
+  }))
+}
+
+function isRemoteUrl(value: string) {
+  return /^https?:\/\//.test(value)
+}
+
+async function withLocalMediaUrl<T>(mediaPath: string, cb: (mediaUrl: string) => Promise<T>) {
+  const resolvedPath = path.resolve(mediaPath)
+  const fileStat = await fs.stat(resolvedPath)
+  const contentType = inferContentTypeFromPath(resolvedPath)
+
+  const server = createServer((request, response) => {
+    if (
+      !request.url ||
+      request.url !== '/media' ||
+      (request.method !== 'GET' && request.method !== 'HEAD')
+    ) {
+      response.writeHead(404)
+      response.end('Not found')
+      return
+    }
+
+    const rangeHeader = request.headers.range
+    if (!rangeHeader) {
+      response.writeHead(200, {
+        'Content-Type': contentType,
+        'Content-Length': fileStat.size,
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-store',
+      })
+      if (request.method === 'HEAD') {
+        response.end()
+        return
+      }
+      createReadStream(resolvedPath).pipe(response)
+      return
+    }
+
+    const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader)
+    if (!match) {
+      response.writeHead(416, {
+        'Content-Range': `bytes */${fileStat.size}`,
+      })
+      response.end()
+      return
+    }
+
+    const start = Number(match[1])
+    const end = match[2] ? Number(match[2]) : fileStat.size - 1
+    const safeEnd = Math.min(end, fileStat.size - 1)
+
+    if (!Number.isFinite(start) || start < 0 || start > safeEnd) {
+      response.writeHead(416, {
+        'Content-Range': `bytes */${fileStat.size}`,
+      })
+      response.end()
+      return
+    }
+
+    response.writeHead(206, {
+      'Content-Type': contentType,
+      'Content-Length': safeEnd - start + 1,
+      'Content-Range': `bytes ${start}-${safeEnd}/${fileStat.size}`,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-store',
+    })
+    if (request.method === 'HEAD') {
+      response.end()
+      return
+    }
+    createReadStream(resolvedPath, { start, end: safeEnd }).pipe(response)
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject)
+      resolve()
+    })
+  })
+
+  const address = server.address() as AddressInfo | null
+  if (!address) {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve()
+      })
+    })
+    throw new Error('Failed to create a local media server for Remotion')
+  }
+
+  try {
+    return await cb(`http://127.0.0.1:${address.port}/media`)
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve()
+      })
+    })
+  }
 }
 
 /**
@@ -752,91 +892,56 @@ export async function processVideo(
     outputPath,
     silenceThreshold = -35,
     silenceDuration = 0.5,
+    silenceRegions: providedSilenceRegions,
+    playbackSegments: providedPlaybackSegments,
     subtitles = [],
     quality = '1080p',
     // format and watermark are reserved for future use
   } = options
 
   try {
-    // 動画の長さを取得
     const duration = await getVideoDuration(inputPath)
+    const silenceRegions =
+      providedSilenceRegions ??
+      await detectSilence(inputPath, silenceThreshold, silenceDuration)
+    const playbackSegments =
+      providedPlaybackSegments ??
+      getPlaybackSegments(
+        duration,
+        toTimelineSilenceRegions(silenceRegions),
+        silenceRegions.length > 0,
+      )
 
-    // 無音部分を検出
-    const silenceRegions = await detectSilence(inputPath, silenceThreshold, silenceDuration)
-
-    // 解像度設定
     const resolutionMap = {
       '720p': { width: 1280, height: 720 },
       '1080p': { width: 1920, height: 1080 },
       '4k': { width: 3840, height: 2160 },
     }
     const { width, height } = resolutionMap[quality]
+    const renderResult = await renderWithRemotion(
+      'VideoComposition',
+      {
+        videoUrl: inputPath,
+        subtitles,
+        playbackSegments,
+        showStyleBadge: false,
+        renderConfig: {
+          width,
+          height,
+        },
+      },
+      outputPath,
+    )
 
-    // 中間ファイルパス（無音カット用）
-    const tempPath = `${outputPath}.temp.mp4`
-
-    // 無音カットを実行
-    const cutResult = await cutSilence(inputPath, tempPath, silenceRegions)
-    if (!cutResult.success || !cutResult.outputPath) {
-      return {
-        success: false,
-        error: cutResult.error || 'Failed to cut silence',
-      }
-    }
-
-    // FFmpegフィルタを構築
-    const filterComplex: string[] = []
-
-    // 字幕フィルタ
-    if (subtitles.length > 0) {
-      const subtitleFilter = subtitles.map((sub) => {
-        const escapedText = sub.text.replace(/'/g, "'\\''")
-        return `drawtext=text='${escapedText}':fontfile=/System/Library/Fonts/Supplemental/Arial.ttf:fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-th-50:enable='between(t,${sub.startTime},${sub.endTime})'`
-      }).join(',')
-      filterComplex.push(subtitleFilter)
-    }
-
-    // スケールフィルタ
-    filterComplex.push(`scale=${width}:${height}`)
-
-    // 出力動画を生成（解像度調整・字幕追加）
-    const args = [
-      '-i', tempPath,
-      ...(filterComplex.length > 0 ? ['-vf', filterComplex.join(',')] : []),
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-c:a', 'aac',
-      '-y',
-      outputPath
-    ]
-
-    await new Promise<void>((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', args)
-
-      ffmpeg.on('close', (code) => {
-        if (code === 0) {
-          resolve()
-        } else {
-          reject(new Error(`FFmpeg exited with code ${code}`))
-        }
-      })
-
-      ffmpeg.on('error', (err) => {
-        reject(err)
-      })
-    })
-
-    // 中間ファイルを削除
-    try {
-      await fs.unlink(tempPath)
-    } catch {
-      // 削除失敗は無視
+    if (!renderResult.success) {
+      return renderResult
     }
 
     return {
       success: true,
       outputPath,
       silenceRegions,
+      playbackSegments,
       duration,
     }
   } catch (error) {
@@ -855,35 +960,66 @@ export async function renderWithRemotion(
   inputProps: Record<string, unknown>,
   outputPath: string
 ): Promise<ProcessingResult> {
-  return new Promise((resolve) => {
-    const args = [
-      'remotion',
-      'render',
-      'remotion/index.ts',
-      compositionId,
-      outputPath,
-      '--props', JSON.stringify(inputProps)
-    ]
+  try {
+    const candidateVideoUrl =
+      typeof inputProps.videoUrl === 'string' ? inputProps.videoUrl : null
 
-    const remotion = spawn('npx', args, {
-      cwd: process.cwd(),
-    })
+    const executeRender = async (resolvedInputProps: Record<string, unknown>) => {
+      return new Promise<ProcessingResult>((resolve) => {
+        const args = [
+          'remotion',
+          'render',
+          'remotion/index.ts',
+          compositionId,
+          outputPath,
+          '--props',
+          JSON.stringify(resolvedInputProps),
+        ]
 
-    remotion.on('close', (code) => {
-      if (code === 0) {
-        resolve({ success: true, outputPath })
-      } else {
-        resolve({
-          success: false,
-          error: `Remotion exited with code ${code}`
+        const remotion = spawn('npx', args, {
+          cwd: process.cwd(),
         })
-      }
-    })
 
-    remotion.on('error', (err) => {
-      resolve({ success: false, error: err.message })
-    })
-  })
+        let stderrOutput = ''
+
+        remotion.stderr.on('data', (data) => {
+          stderrOutput += data.toString()
+        })
+
+        remotion.on('close', (code) => {
+          if (code === 0) {
+            resolve({ success: true, outputPath })
+            return
+          }
+
+          resolve({
+            success: false,
+            error: stderrOutput.trim() || `Remotion exited with code ${code}`,
+          })
+        })
+
+        remotion.on('error', (err) => {
+          resolve({ success: false, error: err.message })
+        })
+      })
+    }
+
+    if (candidateVideoUrl && !isRemoteUrl(candidateVideoUrl)) {
+      return await withLocalMediaUrl(candidateVideoUrl, (mediaUrl) =>
+        executeRender({
+          ...inputProps,
+          videoUrl: mediaUrl,
+        }),
+      )
+    }
+
+    return await executeRender(inputProps)
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to render with Remotion',
+    }
+  }
 }
 
 /**

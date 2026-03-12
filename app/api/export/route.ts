@@ -9,7 +9,7 @@ import {
   validateExportAccess,
 } from '@/lib/billing'
 import prisma from '@/lib/db'
-import { getPlaybackSegments } from '@/lib/editor'
+import { getPlaybackSegments, normalizeSilenceRegions } from '@/lib/editor'
 import type { ExportQuality, SubtitleExportOption } from '@/lib/plans'
 import {
   createVideoBucketSignedGetUrl,
@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
         },
         subtitles: true,
         style: true,
+        aiSuggestions: true,
       },
     })
 
@@ -224,7 +225,14 @@ export async function POST(request: NextRequest) {
       }))
 
       const { width, height } = getRenderDimensions(quality)
-      const playbackSegments = getPlaybackSegments(sourceDurationSeconds, [], false)
+      const cutApplied = project.aiSuggestions.some(
+        (suggestion) => suggestion.type === 'SILENCE_CUT' && suggestion.isApplied,
+      )
+      const playbackSegments = getPlaybackSegments(
+        sourceVideo.duration,
+        normalizeSilenceRegions(sourceVideo.silenceDetected),
+        cutApplied,
+      )
 
       let srtKey: string | null = null
       if ((subtitleOption === 'srt' || subtitleOption === 'both') && subtitles.length > 0) {

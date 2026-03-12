@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { processVideo, detectSilence, extractAudio, getVideoDuration, generateThumbnail, generateWaveformData } from '@/lib/video-processor'
-import { transcribeAudio, generateSubtitles, generateSRT } from '@/lib/ai'
+import { transcribeAudio, generateSubtitles } from '@/lib/ai'
 import { prisma } from '@/lib/db'
+import { serializeSegmentsToSrt } from '@/lib/remotion-captions-adapter'
 import path from 'path'
 import fs from 'fs/promises'
 
@@ -36,6 +37,27 @@ type ProcessingStyleSettings = {
   subtitleSettings: SubtitleSettings
   bgmSettings: BgmSettings
   tempoSettings: TempoSettings
+}
+
+function getSilenceThresholdDb(aggressiveness: CutSettings['aggressiveness']) {
+  switch (aggressiveness) {
+    case 'low':
+      return -30
+    case 'high':
+      return -40
+    case 'medium':
+    default:
+      return -35
+  }
+}
+
+function serializeSilenceRegions(
+  regions: Array<{ startTime: number; endTime: number }>,
+) {
+  return regions.map((region) => ({
+    start: region.startTime,
+    end: region.endTime,
+  }))
 }
 
 /**
@@ -248,7 +270,7 @@ export async function POST(request: NextRequest) {
     }
 
     // SRTファイルを生成
-    const srtContent = generateSRT(subtitles)
+    const srtContent = serializeSegmentsToSrt(subtitles)
     await fs.writeFile(srtPath, srtContent, 'utf-8')
 
     await prisma.project.update({
@@ -257,15 +279,13 @@ export async function POST(request: NextRequest) {
     })
 
     // ステップ4: 無音検出
-    const silenceRegions = await detectSilence(
-      inputPath,
-      styleSettings.cutSettings.minSilence ?? -35,
-      0.5
-    )
+    const silenceThreshold = getSilenceThresholdDb(styleSettings.cutSettings.aggressiveness)
+    const silenceDuration = styleSettings.cutSettings.minSilence ?? 0.3
+    const silenceRegions = await detectSilence(inputPath, silenceThreshold, silenceDuration)
 
     await prisma.project.update({
       where: { id: projectId },
-      data: { progress: 80, progressMessage: 'Processing video...' },
+      data: { progress: 80, progressMessage: 'Rendering with Remotion...' },
     })
 
     // ステップ5: 動画処理（無音カット + 字幕バーンイン）
@@ -273,8 +293,9 @@ export async function POST(request: NextRequest) {
     const result = await processVideo({
       inputPath,
       outputPath,
-      silenceThreshold: styleSettings.cutSettings.minSilence ?? -35,
-      silenceDuration: 0.5,
+      silenceThreshold,
+      silenceDuration,
+      silenceRegions,
       subtitles: subtitles.map((sub) => ({
         text: sub.text,
         startTime: sub.start,
@@ -285,6 +306,14 @@ export async function POST(request: NextRequest) {
       format: 'mp4',
       watermark: options?.watermark ?? false,
     })
+
+    if (!result.success) {
+      await updateProjectError(projectId, result.error || 'Video processing failed')
+      return NextResponse.json(
+        { error: result.error || 'Failed to process video' },
+        { status: 500 }
+      )
+    }
 
     await prisma.project.update({
       where: { id: projectId },
@@ -301,15 +330,16 @@ export async function POST(request: NextRequest) {
     )
 
     // ステップ7: 波形データ生成
-    const waveformData = await generateWaveformData(outputPath, 100)
+    const waveformData = await generateWaveformData(inputPath, 100)
 
     // ステップ8: 動画メタデータを更新
     await prisma.video.update({
       where: { id: video.id },
       data: {
         duration: result.duration,
-        silenceDetected: silenceRegions as unknown as Prisma.InputJsonValue,
+        silenceDetected: serializeSilenceRegions(silenceRegions) as Prisma.InputJsonValue,
         waveform: (waveformData.data ?? []) as Prisma.InputJsonValue,
+        thumbnailUrl: `/api/thumbnail/${projectId}`,
       },
     })
 
@@ -328,8 +358,9 @@ export async function POST(request: NextRequest) {
       success: true,
       projectId,
       outputPath: `/api/download/${projectId}`,
-      silenceRegions,
+      silenceRegions: serializeSilenceRegions(silenceRegions),
       duration: result.duration,
+      playbackSegments: result.playbackSegments,
       subtitles,
       thumbnailUrl: `/api/thumbnail/${projectId}`,
     })
