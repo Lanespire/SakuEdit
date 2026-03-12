@@ -93,6 +93,7 @@ export default $config({
       environment: {
         // Video bucket name accessible via Resource.VideoBucket.name
         // Video processor URL accessible via Resource.VideoProcessor.url
+        VIDEO_BUCKET_NAME: videoBucket.name,
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: stripePublishableKey.value,
         STRIPE_PRO_PRICE_ID: stripeResources?.pro.monthlyPriceId ?? "",
         STRIPE_BUSINESS_PRICE_ID: stripeResources?.business.monthlyPriceId ?? "",

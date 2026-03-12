@@ -427,6 +427,7 @@ model ExportJob {
   videoPath       String?     // 動画ファイルパス
   srtPath         String?     // SRTファイルパス
   thumbnailPath   String?     // サムネイルパス
+  sourceObjectKey String?     // Export source video S3 key
 
   error           String?
   createdAt       DateTime    @default(now())

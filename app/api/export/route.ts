@@ -1,17 +1,26 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { tmpdir } from 'node:os'
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/db'
 import { auth } from '@/lib/auth'
-import { exportVideo, generateSRTContent, generateThumbnail } from '@/lib/video-processor'
 import {
   calculateExportChargeSeconds,
   getBillingSnapshot,
   validateExportAccess,
 } from '@/lib/billing'
+import prisma from '@/lib/db'
+import { getPlaybackSegments } from '@/lib/editor'
 import type { ExportQuality, SubtitleExportOption } from '@/lib/plans'
-import path from 'path'
-import fs from 'fs/promises'
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads'
+import {
+  createVideoBucketSignedGetUrl,
+  uploadFileToVideoBucket,
+  uploadTextToVideoBucket,
+} from '@/lib/server/video-bucket'
+import {
+  generateSRTContent,
+  generateThumbnail,
+  renderWithRemotion,
+} from '@/lib/video-processor'
 
 function normalizeQuality(value: unknown): ExportQuality {
   return value === '1080p' || value === '4k' ? value : '720p'
@@ -33,10 +42,47 @@ function is4kSource(width?: number | null, height?: number | null) {
   return longEdge >= 3840 && shortEdge >= 2160
 }
 
-// POST /api/export - Create export job and process
+function getRenderDimensions(quality: ExportQuality) {
+  switch (quality) {
+    case '4k':
+      return { width: 3840, height: 2160 }
+    case '1080p':
+      return { width: 1920, height: 1080 }
+    case '720p':
+    default:
+      return { width: 1280, height: 720 }
+  }
+}
+
+function buildExportObjectKey(projectId: string, exportJobId: string, fileName: string) {
+  return `projects/${projectId}/exports/${exportJobId}/${fileName}`
+}
+
+function getVideoContentType(format: string) {
+  switch (format) {
+    case 'mov':
+      return 'video/quicktime'
+    case 'webm':
+      return 'video/webm'
+    case 'mp4':
+    default:
+      return 'video/mp4'
+  }
+}
+
+async function withTempDir<T>(projectId: string, exportJobId: string, cb: (dir: string) => Promise<T>) {
+  const tempDir = path.join(tmpdir(), 'sakuedit-export', projectId, exportJobId)
+  await fs.mkdir(tempDir, { recursive: true })
+
+  try {
+    return await cb(tempDir)
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Check for test mode (development only)
     const url = new URL(request.url)
     const testUserId = url.searchParams.get('testUserId')
     const isTestMode = process.env.NODE_ENV === 'development' && testUserId
@@ -68,20 +114,19 @@ export async function POST(request: NextRequest) {
     const subtitleOption = normalizeSubtitleOption(requestedSubtitleOption)
 
     if (!projectId) {
-      return NextResponse.json(
-        { error: 'Project ID is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
 
-    // Verify project ownership
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: {
         videos: {
           where: { storagePath: { not: null } },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
         },
         subtitles: true,
+        style: true,
       },
     })
 
@@ -89,16 +134,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    if (!project.videos[0]?.storagePath) {
-      return NextResponse.json(
-        { error: 'No video source found' },
-        { status: 400 }
-      )
+    const sourceVideo = project.videos[0]
+    if (!sourceVideo?.storagePath) {
+      return NextResponse.json({ error: 'No video source found' }, { status: 400 })
     }
 
     const billing = await getBillingSnapshot(userId)
     const plan = billing.plan
-    const sourceVideo = project.videos[0]
     const sourceDurationSeconds = Math.ceil(sourceVideo.duration || 0)
     const billedSeconds = calculateExportChargeSeconds(sourceDurationSeconds, quality)
 
@@ -138,75 +180,102 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create export job
     const exportJob = await prisma.exportJob.create({
       data: {
         projectId,
         status: 'PROCESSING',
         progress: 0,
+        progressMessage: '書き出しを準備しています',
         quality,
         format,
       },
     })
 
-    // Update project status
     await prisma.project.update({
       where: { id: projectId },
       data: { status: 'EXPORTING' },
     })
 
-    // Process export (synchronous for local dev, should be async in production)
     try {
-      const inputPath = project.videos[0].storagePath
-      console.log(`[export] Starting export for project ${projectId}, input: ${inputPath}`)
-      const outputDir = path.join(UPLOAD_DIR, 'exports', projectId)
-      await fs.mkdir(outputDir, { recursive: true })
-
-      const outputFilename = `output_${Date.now()}.${format}`
-      const outputPath = path.join(outputDir, outputFilename)
-
-      // Prepare subtitles for burn-in
-      const subtitles = project.subtitles.map(sub => ({
-        text: sub.text,
-        startTime: (sub.startTime ?? 0) / 1000, // Convert ms to seconds
-        endTime: (sub.endTime ?? 0) / 1000,
-      }))
-
-      console.log(`[export] Running FFmpeg: ${quality} ${format}, ${subtitles.length} subtitles`)
-      const exportStartTime = Date.now()
-      // Run FFmpeg export with quality and optional subtitle burn-in
-      const exportResult = await exportVideo(inputPath, outputPath, {
-        quality,
-        format,
-        subtitles: subtitleOption === 'burn' || subtitleOption === 'both' ? subtitles : [],
-        burnSubtitles: subtitleOption === 'burn' || subtitleOption === 'both',
+      const sourceObjectKey = buildExportObjectKey(
+        projectId,
+        exportJob.id,
+        `source${path.extname(sourceVideo.filename || sourceVideo.storagePath) || '.mp4'}`,
+      )
+      await uploadFileToVideoBucket(sourceVideo.storagePath, sourceObjectKey, {
+        contentType: sourceVideo.mimeType || 'video/mp4',
       })
 
-      console.log(`[export] FFmpeg completed in ${((Date.now() - exportStartTime) / 1000).toFixed(1)}s, success: ${exportResult.success}`)
-      if (!exportResult.success) {
-        throw new Error(exportResult.error || 'Video export failed')
-      }
+      const sourceVideoUrl = await createVideoBucketSignedGetUrl(sourceObjectKey, {
+        expiresInSeconds: 60 * 60 * 24,
+        contentType: sourceVideo.mimeType || 'video/mp4',
+      })
 
-      // Generate thumbnail if requested
-      let thumbnailPath: string | null = null
-      if (exportThumbnail) {
-        thumbnailPath = path.join(outputDir, `thumbnail_${Date.now()}.jpg`)
-        const thumbResult = await generateThumbnail(outputPath, thumbnailPath, 1, 1280, 720)
-        if (!thumbResult.success) {
-          console.warn('Thumbnail generation failed:', thumbResult.error)
-          thumbnailPath = null
-        }
-      }
+      const subtitles = project.subtitles.map((sub) => ({
+        id: sub.id,
+        text: sub.text,
+        startTime: sub.startTime ?? 0,
+        endTime: sub.endTime ?? 0,
+        position: sub.position ?? 'bottom',
+        fontSize: sub.fontSize ?? 24,
+        fontColor: sub.fontColor ?? '#FFFFFF',
+        backgroundColor: sub.backgroundColor ?? '#00000080',
+        isBold: sub.isBold ?? false,
+      }))
 
-      // Generate SRT if separate subtitles requested
-      let srtPath: string | null = null
+      const { width, height } = getRenderDimensions(quality)
+      const playbackSegments = getPlaybackSegments(sourceDurationSeconds, [], false)
+
+      let srtKey: string | null = null
       if ((subtitleOption === 'srt' || subtitleOption === 'both') && subtitles.length > 0) {
-        srtPath = path.join(outputDir, `subtitles_${Date.now()}.srt`)
-        const srtContent = generateSRTContent(subtitles)
-        await fs.writeFile(srtPath, srtContent, 'utf-8')
+        srtKey = buildExportObjectKey(projectId, exportJob.id, 'subtitles.srt')
+        await uploadTextToVideoBucket(srtKey, generateSRTContent(subtitles), {
+          contentType: 'text/plain; charset=utf-8',
+        })
       }
 
-      // Update export job as completed with file paths
+      const { videoKey, thumbnailKey } = await withTempDir(projectId, exportJob.id, async (tempDir) => {
+        const outputPath = path.join(tempDir, `output.${format}`)
+        const renderResult = await renderWithRemotion(
+          'VideoComposition',
+          {
+            videoUrl: sourceVideoUrl,
+            subtitles: subtitleOption === 'burn' || subtitleOption === 'both' ? subtitles : [],
+            styleName: project.style?.name,
+            playbackSegments,
+            showStyleBadge: false,
+            renderConfig: {
+              width,
+              height,
+            },
+          },
+          outputPath,
+        )
+
+        if (!renderResult.success) {
+          throw new Error(renderResult.error || 'Video export failed')
+        }
+
+        const videoKey = buildExportObjectKey(projectId, exportJob.id, `video.${format}`)
+        await uploadFileToVideoBucket(outputPath, videoKey, {
+          contentType: getVideoContentType(format),
+        })
+
+        let thumbnailKey: string | null = null
+        if (exportThumbnail) {
+          const thumbnailPath = path.join(tempDir, 'thumbnail.jpg')
+          const thumbnailResult = await generateThumbnail(outputPath, thumbnailPath, 1, 1280, 720)
+          if (thumbnailResult.success) {
+            thumbnailKey = buildExportObjectKey(projectId, exportJob.id, 'thumbnail.jpg')
+            await uploadFileToVideoBucket(thumbnailPath, thumbnailKey, {
+              contentType: 'image/jpeg',
+            })
+          }
+        }
+
+        return { videoKey, thumbnailKey }
+      })
+
       const completedJob = await prisma.exportJob.update({
         where: { id: exportJob.id },
         data: {
@@ -214,17 +283,13 @@ export async function POST(request: NextRequest) {
           progress: 100,
           progressMessage: 'Export completed',
           completedAt: new Date(),
-          // API URLs for frontend
+          sourceObjectKey,
           videoUrl: `/api/export/${projectId}/${exportJob.id}/video`,
-          srtUrl:
-            subtitleOption === 'srt' || subtitleOption === 'both'
-              ? `/api/export/${projectId}/${exportJob.id}/srt`
-              : null,
-          thumbnailUrl: exportThumbnail ? `/api/export/${projectId}/${exportJob.id}/thumbnail` : null,
-          // Actual file paths for download
-          videoPath: outputPath,
-          srtPath: srtPath,
-          thumbnailPath: thumbnailPath,
+          srtUrl: srtKey ? `/api/export/${projectId}/${exportJob.id}/srt` : null,
+          thumbnailUrl: thumbnailKey ? `/api/export/${projectId}/${exportJob.id}/thumbnail` : null,
+          videoPath: videoKey,
+          srtPath: srtKey,
+          thumbnailPath: thumbnailKey,
         },
       })
 
@@ -247,10 +312,9 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Update project status
       await prisma.project.update({
         where: { id: projectId },
-        data: { status: 'COMPLETED', completedAt: new Date() },
+        data: { status: 'COMPLETED', completedAt: new Date(), lastError: null },
       })
 
       return NextResponse.json({
@@ -263,7 +327,6 @@ export async function POST(request: NextRequest) {
         },
       })
     } catch (processError) {
-      // Update export job as failed
       await prisma.exportJob.update({
         where: { id: exportJob.id },
         data: {
@@ -282,13 +345,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Export error:', error)
-    return NextResponse.json(
-      { error: 'Failed to export video' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to export video' }, { status: 500 })
   }
 }
-
-// GET /api/export/[projectId]/[jobId] - Get export job status
-// Note: This route should be moved to a separate route file if needed
-// Currently handled by the export POST endpoint which returns the job status

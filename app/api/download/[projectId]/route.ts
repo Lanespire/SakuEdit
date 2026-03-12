@@ -101,6 +101,10 @@ export async function GET(
         )
     }
 
+    if (filePath.startsWith('/api/')) {
+      return NextResponse.redirect(new URL(filePath, request.url))
+    }
+
     // ファイルの存在確認
     try {
       await fs.access(filePath)
