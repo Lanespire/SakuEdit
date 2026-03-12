@@ -1,9 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { processVideo, detectSilence, extractAudio, getVideoDuration, generateThumbnail, generateWaveformData } from '@/lib/video-processor'
 import { transcribeAudio, generateSubtitles, generateSRT } from '@/lib/ai'
 import { prisma } from '@/lib/db'
 import path from 'path'
 import fs from 'fs/promises'
+
+type CutSettings = {
+  minSilence: number
+  aggressiveness: 'low' | 'medium' | 'high'
+  targetCutsPerMinute: number
+}
+
+type SubtitleSettings = {
+  font: string
+  size: number
+  position: 'bottom' | 'middle' | 'top'
+  color: string
+  backgroundColor?: string
+}
+
+type BgmSettings = {
+  genre: string
+  volume: number
+  tempo: 'slow' | 'medium' | 'fast'
+}
+
+type TempoSettings = {
+  minClipDuration: number
+  maxClipDuration: number
+}
+
+type ProcessingStyleSettings = {
+  cutSettings: CutSettings
+  subtitleSettings: SubtitleSettings
+  bgmSettings: BgmSettings
+  tempoSettings: TempoSettings
+}
 
 /**
  * Process video: extract audio, transcribe, cut silence, generate output
@@ -73,36 +106,53 @@ export async function POST(request: NextRequest) {
     const outputPath = path.join(projectDir, 'output.mp4')
 
     // スタイル設定を取得（プロジェクトに紐づけられたスタイルまたはデフォルト）
-    const styleSettings = project.style
+    const defaultStyleSettings: ProcessingStyleSettings = {
+      cutSettings: {
+        minSilence: 0.3,
+        aggressiveness: 'medium',
+        targetCutsPerMinute: 15,
+      },
+      subtitleSettings: {
+        font: 'Noto Sans JP',
+        size: 24,
+        position: 'bottom',
+        color: '#FFFFFF',
+        backgroundColor: '#00000080',
+      },
+      bgmSettings: {
+        genre: 'upbeat',
+        volume: 0.3,
+        tempo: 'medium',
+      },
+      tempoSettings: {
+        minClipDuration: 2,
+        maxClipDuration: 10,
+      },
+    }
+
+    const styleSettings: ProcessingStyleSettings = project.style
       ? {
-          cutSettings: project.style.cutSettings as any,
-          subtitleSettings: project.style.subtitleSettings as any,
-          bgmSettings: project.style.bgmSettings as any,
-          tempoSettings: project.style.tempoSettings as any,
-        }
-      : {
           cutSettings: {
-            minSilence: 0.3,
-            aggressiveness: 'medium' as const,
-            targetCutsPerMinute: 15,
+            ...defaultStyleSettings.cutSettings,
+            ...((project.style.cutSettings as Partial<CutSettings> | null) ?? {}),
           },
           subtitleSettings: {
-            font: 'Noto Sans JP',
-            size: 24,
-            position: 'bottom' as const,
-            color: '#FFFFFF',
-            backgroundColor: '#00000080',
+            ...defaultStyleSettings.subtitleSettings,
+            ...((project.style.subtitleSettings as Partial<SubtitleSettings> | null) ?? {}),
           },
           bgmSettings: {
-            genre: 'upbeat',
-            volume: 0.3,
-            tempo: 'medium',
+            ...defaultStyleSettings.bgmSettings,
+            ...((project.style.bgmSettings as Partial<BgmSettings> | null) ?? {}),
           },
           tempoSettings: {
-            minClipDuration: 2,
-            maxClipDuration: 10,
+            ...defaultStyleSettings.tempoSettings,
+            ...((project.style.tempoSettings as Partial<TempoSettings> | null) ?? {}),
           },
         }
+      : defaultStyleSettings
+
+    const shouldReuseExistingSubtitles =
+      Boolean(options?.reuseExistingSubtitles) && project.subtitles.length > 0
 
     // プロジェクト状態を更新：処理開始
     await prisma.project.update({
@@ -127,50 +177,75 @@ export async function POST(request: NextRequest) {
 
     await prisma.project.update({
       where: { id: projectId },
-      data: { progress: 20, progressMessage: 'Transcribing audio...' },
+      data: {
+        progress: 20,
+        progressMessage: shouldReuseExistingSubtitles
+          ? 'Reusing existing subtitles...'
+          : 'Transcribing audio...',
+      },
     })
 
-    // ステップ2: 文字起こし（ASR）
-    let asrResult
-    try {
-      asrResult = await transcribeAudio(audioPath, 'ja')
-    } catch (error) {
-      await updateProjectError(projectId, `Speech recognition failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      return NextResponse.json(
-        { error: `Speech recognition failed: ${error instanceof Error ? error.message : 'Unknown error'}` },
-        { status: 500 }
+    let subtitles: Array<{ start: number; end: number; text: string }>
+
+    if (shouldReuseExistingSubtitles) {
+      subtitles = project.subtitles.map((subtitle) => ({
+        start: subtitle.startTime,
+        end: subtitle.endTime,
+        text: subtitle.text,
+      }))
+
+      await prisma.subtitle.updateMany({
+        where: { projectId: projectId! },
+        data: {
+          position: styleSettings.subtitleSettings.position,
+          fontSize: styleSettings.subtitleSettings.size,
+          fontColor: styleSettings.subtitleSettings.color,
+          backgroundColor: styleSettings.subtitleSettings.backgroundColor,
+        },
+      })
+    } else {
+      // ステップ2: 文字起こし（ASR）
+      let asrResult
+      try {
+        asrResult = await transcribeAudio(audioPath, 'ja')
+      } catch (error) {
+        await updateProjectError(projectId, `Speech recognition failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        return NextResponse.json(
+          { error: `Speech recognition failed: ${error instanceof Error ? error.message : 'Unknown error'}` },
+          { status: 500 }
+        )
+      }
+
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { progress: 40, progressMessage: 'Generating subtitles...' },
+      })
+
+      // ステップ3: 字幕生成（ASRのセグメントを使用）
+      subtitles = await generateSubtitles(
+        asrResult.text,
+        asrResult.segments,
+        styleSettings.subtitleSettings
       )
+
+      // 字幕をDBに保存
+      // 既存の字幕を削除してから再作成
+      await prisma.subtitle.deleteMany({ where: { projectId: projectId! } })
+      await prisma.subtitle.createMany({
+        data: subtitles.map((sub) => ({
+          projectId: projectId!,
+          startTime: sub.start,
+          endTime: sub.end,
+          text: sub.text,
+          style: 'default',
+          position: styleSettings.subtitleSettings.position,
+          fontSize: styleSettings.subtitleSettings.size,
+          fontColor: styleSettings.subtitleSettings.color,
+          backgroundColor: styleSettings.subtitleSettings.backgroundColor,
+          isBold: false,
+        })),
+      })
     }
-
-    await prisma.project.update({
-      where: { id: projectId },
-      data: { progress: 40, progressMessage: 'Generating subtitles...' },
-    })
-
-    // ステップ3: 字幕生成（ASRのセグメントを使用）
-    const subtitles = await generateSubtitles(
-      asrResult.text,
-      asrResult.segments,
-      styleSettings.subtitleSettings
-    )
-
-    // 字幕をDBに保存
-    // 既存の字幕を削除してから再作成
-    await prisma.subtitle.deleteMany({ where: { projectId: projectId! } })
-    await prisma.subtitle.createMany({
-      data: subtitles.map((sub) => ({
-        projectId: projectId!,
-        startTime: sub.start,
-        endTime: sub.end,
-        text: sub.text,
-        style: 'default',
-        position: styleSettings.subtitleSettings.position,
-        fontSize: styleSettings.subtitleSettings.size,
-        fontColor: styleSettings.subtitleSettings.color,
-        backgroundColor: styleSettings.subtitleSettings.backgroundColor,
-        isBold: false,
-      })),
-    })
 
     // SRTファイルを生成
     const srtContent = generateSRT(subtitles)
@@ -232,8 +307,9 @@ export async function POST(request: NextRequest) {
     await prisma.video.update({
       where: { id: video.id },
       data: {
-        silenceDetected: silenceRegions as any,
-        waveform: waveformData.data as any,
+        duration: result.duration,
+        silenceDetected: silenceRegions as unknown as Prisma.InputJsonValue,
+        waveform: (waveformData.data ?? []) as Prisma.InputJsonValue,
       },
     })
 

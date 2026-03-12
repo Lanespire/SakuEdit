@@ -100,9 +100,11 @@ function formatMinutes(value: number) {
 }
 
 function getProjectHref(project: Project) {
-  return project.status === 'COMPLETED'
-    ? `/edit/${project.id}`
-    : `/processing/${project.id}`
+  const processingStatuses = new Set(['PROCESSING', 'QUEUED', 'UPLOADING', 'ANALYZING'])
+
+  return processingStatuses.has(project.status)
+    ? `/processing/${project.id}`
+    : `/edit/${project.id}`
 }
 
 function getStatusBadge(status: string) {

@@ -68,7 +68,7 @@ export default function SubtitleEditModal({
   const duration = (editedSubtitle.end ?? 0) - (editedSubtitle.start ?? 0)
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-test-id="subtitle-edit-modal">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-test-id="modal-backdrop">
       <div className="bg-[#2c1e16] border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
@@ -86,7 +86,7 @@ export default function SubtitleEditModal({
               onClick={onPrev}
               disabled={currentIndex === 0}
               className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg disabled:opacity-30 transition-colors"
-              data-test-id="subtitle-edit-prev-button"
+              data-test-id="prev-subtitle"
             >
               <span className="material-symbols-outlined">chevron_left</span>
             </button>
@@ -94,14 +94,14 @@ export default function SubtitleEditModal({
               onClick={onNext}
               disabled={currentIndex === totalCount - 1}
               className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg disabled:opacity-30 transition-colors"
-              data-test-id="subtitle-edit-next-button"
+              data-test-id="next-subtitle"
             >
               <span className="material-symbols-outlined">chevron_right</span>
             </button>
             <button
               onClick={onClose}
               className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              data-test-id="subtitle-edit-close-button"
+              data-test-id="close-modal"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -162,7 +162,7 @@ export default function SubtitleEditModal({
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white resize-none focus:ring-2 focus:ring-primary focus:border-primary/50 outline-none"
                   rows={3}
                   maxLength={40}
-                  data-test-id="subtitle-edit-textarea"
+                  data-test-id="subtitle-text-input"
                 />
                 <div className="absolute bottom-2 right-3 text-xs text-white/50" data-test-id="subtitle-edit-char-count">
                   {editedSubtitle.text.length} / 40文字
@@ -189,7 +189,7 @@ export default function SubtitleEditModal({
                     value={formatTime(editedSubtitle.start ?? 0)}
                     onChange={(e) => handleTimeChange('start', e.target.value)}
                     className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-center font-mono text-sm focus:ring-2 focus:ring-primary outline-none"
-                    data-test-id="subtitle-edit-start-time"
+                    data-test-id="start-time-input"
                   />
                   <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
                     <span className="material-symbols-outlined text-sm">add</span>
@@ -207,7 +207,7 @@ export default function SubtitleEditModal({
                     value={formatTime(editedSubtitle.end ?? 0)}
                     onChange={(e) => handleTimeChange('end', e.target.value)}
                     className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-center font-mono text-sm focus:ring-2 focus:ring-primary outline-none"
-                    data-test-id="subtitle-edit-end-time"
+                    data-test-id="end-time-input"
                   />
                   <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
                     <span className="material-symbols-outlined text-sm">add</span>
@@ -224,15 +224,16 @@ export default function SubtitleEditModal({
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-2">スタイル</label>
                 <select
-                  value={editedSubtitle.style || 'standard'}
+                  value={editedSubtitle.style || 'default'}
                   onChange={(e) => setEditedSubtitle(prev => ({ ...prev, style: e.target.value }))}
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
-                  data-test-id="subtitle-edit-style-select"
+                  data-test-id="style-select"
                 >
-                  <option value="standard">標準</option>
-                  <option value="emphasis">強調</option>
-                  <option value="whisper">ささやき</option>
-                  <option value="shout">叫び</option>
+                  <option value="default">標準</option>
+                  <option value="youtuber">YouTuber</option>
+                  <option value="minimal">ミニマル</option>
+                  <option value="bold">太字</option>
+                  <option value="outline">縁取り</option>
                 </select>
               </div>
               <div>
@@ -255,18 +256,25 @@ export default function SubtitleEditModal({
             <div>
               <label className="block text-sm font-medium text-white/70 mb-2">配置</label>
               <div className="grid grid-cols-3 gap-2 w-32" data-test-id="subtitle-edit-position-grid">
-                {['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'].map((pos) => (
+                {[
+                  { id: 'top', label: '上' },
+                  { id: 'center', label: '中' },
+                  { id: 'bottom-center', label: '下' },
+                ].map((pos) => (
                   <button
-                    key={pos}
-                    onClick={() => setEditedSubtitle(prev => ({ ...prev, position: pos }))}
+                    key={pos.id}
+                    onClick={() => setEditedSubtitle(prev => ({ ...prev, position: pos.id }))}
                     className={`aspect-square rounded-lg border transition-colors ${
-                      (editedSubtitle.position || 'bottom-center') === pos
+                      (editedSubtitle.position || 'bottom-center') === pos.id
                         ? 'bg-primary border-primary'
                         : 'bg-white/5 border-white/10 hover:border-white/30'
                     }`}
+                    data-test-id={`position-${pos.id === 'center' ? 'middle' : pos.id === 'bottom-center' ? 'bottom' : 'top'}`}
                   >
-                    {(editedSubtitle.position || 'bottom-center') === pos && (
+                    {(editedSubtitle.position || 'bottom-center') === pos.id ? (
                       <span className="material-symbols-outlined text-white text-sm">check</span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-white/45">{pos.label}</span>
                     )}
                   </button>
                 ))}
@@ -289,14 +297,14 @@ export default function SubtitleEditModal({
             <button
               onClick={onClose}
               className="px-6 py-2 text-sm font-medium text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
-              data-test-id="subtitle-edit-cancel-button"
+              data-test-id="cancel-button"
             >
               キャンセル
             </button>
             <button
               onClick={() => onSave(editedSubtitle)}
               className="px-6 py-2 text-sm font-bold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-lg shadow-primary/20 transition-colors"
-              data-test-id="subtitle-edit-save-button"
+              data-test-id="save-subtitle"
             >
               保存
             </button>

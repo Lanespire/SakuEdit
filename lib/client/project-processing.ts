@@ -1,6 +1,13 @@
 import { postJson } from '@/lib/client/http'
 
-export async function startProjectProcessing(projectId: string) {
+interface StartProjectProcessingOptions {
+  reuseExistingSubtitles?: boolean
+}
+
+export async function startProjectProcessing(
+  projectId: string,
+  options: StartProjectProcessingOptions = {},
+) {
   await postJson<
     Record<string, unknown>,
     {
@@ -12,6 +19,7 @@ export async function startProjectProcessing(projectId: string) {
         quality: string
         format: string
         watermark: boolean
+        reuseExistingSubtitles: boolean
       }
     }
   >('/api/process/start', {
@@ -23,6 +31,7 @@ export async function startProjectProcessing(projectId: string) {
       quality: '720p',
       format: 'mp4',
       watermark: false,
+      reuseExistingSubtitles: Boolean(options.reuseExistingSubtitles),
     },
   })
 }

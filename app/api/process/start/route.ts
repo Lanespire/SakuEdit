@@ -55,9 +55,13 @@ export const POST = handleRoute(async (request: NextRequest) => {
 
   after(async () => {
     try {
+      const cookieHeader = request.headers.get('cookie') || ''
       const response = await fetch(new URL('/api/process', request.url).toString(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': cookieHeader,
+        },
         body: JSON.stringify(body),
       })
 

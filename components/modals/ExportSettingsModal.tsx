@@ -6,6 +6,7 @@ import { canUseQuality, getPlanDefinition, type PlanId } from '@/lib/plans'
 export interface ExportSettings {
   quality: '720p' | '1080p' | '4k'
   format: 'mp4' | 'webm' | 'mov'
+  includeSubtitles: boolean
   subtitleOption: 'burn' | 'srt' | 'both'
   removeWatermark: boolean
   exportThumbnail: boolean
@@ -26,6 +27,7 @@ export default function ExportSettingsModal({
   const [settings, setSettings] = useState<ExportSettings>({
     quality: '720p',
     format: 'mp4',
+    includeSubtitles: true,
     subtitleOption: 'burn',
     removeWatermark: false,
     exportThumbnail: false,
@@ -55,7 +57,7 @@ export default function ExportSettingsModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-test-id="export-modal">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-test-id="modal-backdrop">
       <div className="bg-[#2c1e16] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
@@ -66,7 +68,7 @@ export default function ExportSettingsModal({
           <button
             onClick={onClose}
             className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            data-test-id="export-modal-close-button"
+            data-test-id="close-modal"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -93,7 +95,7 @@ export default function ExportSettingsModal({
                         ? 'bg-white/5 border-white/5 text-white/30 cursor-not-allowed'
                         : 'bg-white/5 border-white/10 text-white hover:border-white/20'
                     }`}
-                    data-test-id={`export-quality-${option.id}`}
+                    data-test-id={`quality-${option.id}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`size-5 rounded-full border-2 flex items-center justify-center ${
@@ -134,30 +136,61 @@ export default function ExportSettingsModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-white/70 mb-2">フォーマット</label>
-              <select
-                value={settings.format}
-                onChange={(e) => setSettings(prev => ({ ...prev, format: e.target.value as typeof settings.format }))}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
-                data-test-id="export-format-select"
-              >
+              <div className="grid grid-cols-3 gap-2">
                 {formatOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, format: opt.id as typeof settings.format }))}
+                    className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+                      settings.format === opt.id
+                        ? 'border-primary bg-primary/15 text-primary'
+                        : 'border-white/10 bg-white/5 text-white/70 hover:text-white'
+                    }`}
+                    data-test-id={`format-${opt.id}`}
+                  >
+                    {opt.label}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-white/70 mb-2">字幕</label>
-              <select
-                value={settings.subtitleOption}
-                onChange={(e) => setSettings(prev => ({ ...prev, subtitleOption: e.target.value as typeof settings.subtitleOption }))}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:ring-2 focus:ring-primary outline-none"
-              >
-                {subtitleOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id} disabled={opt.disabled}>
-                    {opt.disabled ? `${opt.label}（Pro以上）` : opt.label}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm text-white/70">
+                  <input
+                    type="checkbox"
+                    checked={settings.includeSubtitles}
+                    onChange={(event) =>
+                      setSettings(prev => ({ ...prev, includeSubtitles: event.target.checked }))
+                    }
+                    className="size-4 rounded border-white/30 bg-white/5 text-primary focus:ring-primary"
+                    data-test-id="include-subtitles"
+                  />
+                  字幕を書き出しに含める
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  {subtitleOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={opt.disabled || !settings.includeSubtitles}
+                      onClick={() => setSettings(prev => ({ ...prev, subtitleOption: opt.id as typeof settings.subtitleOption }))}
+                      className={`rounded-lg border px-3 py-2 text-left text-sm font-bold transition-colors ${
+                        settings.subtitleOption === opt.id && settings.includeSubtitles
+                          ? 'border-primary bg-primary/15 text-primary'
+                          : opt.disabled || !settings.includeSubtitles
+                            ? 'border-white/5 bg-white/5 text-white/25'
+                            : 'border-white/10 bg-white/5 text-white/70 hover:text-white'
+                      }`}
+                      aria-disabled={opt.disabled || !settings.includeSubtitles}
+                      data-test-id={`subtitle-${opt.id === 'burn' ? 'burn-in' : opt.id}`}
+                    >
+                      {opt.disabled ? `${opt.label}（Pro以上）` : opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -184,7 +217,7 @@ export default function ExportSettingsModal({
                 disabled={plan.hasWatermark}
                 onChange={(e) => setSettings(prev => ({ ...prev, removeWatermark: e.target.checked }))}
                 className="size-5 rounded border-white/30 bg-white/5 text-primary focus:ring-primary"
-                data-test-id="export-watermark-checkbox"
+                data-test-id="include-watermark"
               />
             </label>
 
@@ -209,7 +242,7 @@ export default function ExportSettingsModal({
                 disabled={!plan.hasThumbnail}
                 onChange={(e) => setSettings(prev => ({ ...prev, exportThumbnail: e.target.checked }))}
                 className="size-5 rounded border-white/30 bg-white/5 text-primary focus:ring-primary"
-                data-test-id="export-thumbnail-checkbox"
+                data-test-id="include-thumbnail"
               />
             </label>
           </div>
@@ -224,14 +257,14 @@ export default function ExportSettingsModal({
             <button
               onClick={onClose}
               className="px-6 py-2 text-sm font-medium text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
-              data-test-id="export-cancel-button"
+              data-test-id="cancel-button"
             >
               キャンセル
             </button>
             <button
               onClick={() => onExport(settings)}
               className="px-6 py-2 text-sm font-bold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-lg shadow-primary/20 transition-colors"
-              data-test-id="export-start-button"
+              data-test-id="export-button"
             >
               書き出しを開始
             </button>
