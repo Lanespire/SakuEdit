@@ -8,6 +8,7 @@ import type {
   EditorTrackType,
   EditorVideoAsset,
 } from '@/lib/editor'
+import type { TrackName } from '@/lib/composition-data'
 import { sortSubtitles } from '@/lib/editor'
 
 export type EditorTab = 'ai' | 'subtitle' | 'cut' | 'style'
@@ -56,6 +57,9 @@ interface EditorUiState {
   selectedTrack: EditorTrackType
   selectedSuggestionId: string | null
 
+  selectedItemId: string | null
+  selectedItemTrack: TrackName | null
+
   undoStack: EditorSnapshot[]
   redoStack: EditorSnapshot[]
 
@@ -86,6 +90,7 @@ interface EditorUiState {
   setCutApplied: (cutApplied: boolean, pushToHistory?: boolean) => void
   setSelectedTrack: (track: EditorTrackType) => void
   setSelectedSuggestionId: (suggestionId: string | null) => void
+  setSelectedItem: (itemId: string | null, track: TrackName | null) => void
   selectSubtitleById: (subtitleId: string | null) => void
   openSubtitleModal: (index: number) => void
   closeSubtitleModal: () => void
@@ -171,6 +176,9 @@ export const useEditorUiStore = create<EditorUiState>((set, get) => {
     selectedTrack: 'video',
     selectedSuggestionId: null,
 
+    selectedItemId: null,
+    selectedItemTrack: null,
+
     undoStack: [],
     redoStack: [],
 
@@ -220,6 +228,7 @@ export const useEditorUiStore = create<EditorUiState>((set, get) => {
     setWithHistory(() => ({ cutApplied }), pushToHistory),
   setSelectedTrack: (selectedTrack) => set({ selectedTrack }),
   setSelectedSuggestionId: (selectedSuggestionId) => set({ selectedSuggestionId }),
+  setSelectedItem: (selectedItemId, selectedItemTrack) => set({ selectedItemId, selectedItemTrack }),
   selectSubtitleById: (selectedSubtitleId) =>
     set((state) => ({
       selectedSubtitleId,

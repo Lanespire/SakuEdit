@@ -24,6 +24,7 @@ interface IntegratedEditorPanelProps {
   subtitleIntervalSeconds: number
   playbackRate: number
   onSendPrompt: (prompt: string) => void
+  onSendCompositionChat?: (message: string) => void
   onApplySuggestion: (id: string) => void
   onPreviewSuggestion: (id: string) => void
   onZoomChange: (zoomLevel: number) => void
@@ -104,6 +105,7 @@ export default function IntegratedEditorPanel({
   subtitleIntervalSeconds,
   playbackRate,
   onSendPrompt,
+  onSendCompositionChat,
   onApplySuggestion,
   onPreviewSuggestion,
   onZoomChange,
@@ -146,7 +148,11 @@ export default function IntegratedEditorPanel({
       return
     }
 
-    onSendPrompt(nextPrompt)
+    if (onSendCompositionChat) {
+      onSendCompositionChat(nextPrompt)
+    } else {
+      onSendPrompt(nextPrompt)
+    }
     setPrompt('')
   }
 

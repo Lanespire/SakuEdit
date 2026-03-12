@@ -15,6 +15,7 @@ const timelineMutationSchema = z.object({
   zoomLevel: z.number().min(0.25).max(8),
   scrollPosition: z.number().min(0),
   isPlaying: z.boolean().optional(),
+  compositionData: z.string().optional(),
 })
 
 async function assertOwnedProject(projectId: string, userId: string) {
@@ -40,6 +41,13 @@ export const PATCH = handleRoute(async (
   const body = await parseJson(request, timelineMutationSchema)
 
   await assertOwnedProject(projectId, userId)
+
+  if (body.compositionData !== undefined) {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { compositionData: body.compositionData },
+    })
+  }
 
   const timeline = await prisma.timeline.upsert({
     where: { projectId },

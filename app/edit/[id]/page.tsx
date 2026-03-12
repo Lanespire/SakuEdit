@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import EditorHeader from '@/components/editor/EditorHeader'
 import EditorTimeline from '@/components/editor/EditorTimeline'
+import MultiTrackTimeline from '@/components/editor/MultiTrackTimeline'
+import PropertyPanel from '@/components/editor/PropertyPanel'
+import AddItemPanel from '@/components/editor/AddItemPanel'
 import IntegratedEditorPanel from '@/components/editor/IntegratedEditorPanel'
 import VideoPlayer from '@/components/editor/VideoPlayer'
 import { ExportSettingsModal, SubtitleEditModal, type ExportSettings, type Subtitle } from '@/components/modals'
@@ -30,6 +33,8 @@ import {
 } from '@/lib/editor'
 import { useEditorActions } from '@/lib/hooks/useEditorActions'
 import { type AIChatMessage, useEditorUiStore } from '@/lib/stores/editor-ui-store'
+import { useCompositionStore } from '@/lib/stores/composition-store'
+import type { TrackName } from '@/lib/composition-data'
 import type { PlanId } from '@/lib/plans'
 
 interface ProjectResponse {
@@ -49,6 +54,7 @@ interface ProjectResponse {
       label?: string | null
       color?: string
     }>
+    compositionData?: string | null
     style?: {
       name: string
       description?: string | null
@@ -109,6 +115,7 @@ export default function EditPage() {
   const pendingNewSubtitleIdRef = useRef<string | null>(null)
   const hasHydratedRef = useRef(false)
   const timelineSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const compositionStore = useCompositionStore()
 
   const {
     isSubtitleModalOpen,
@@ -155,9 +162,13 @@ export default function EditPage() {
     appendChatMessage,
     setSaving,
     setLastSavedAt,
+    selectedItemId,
+    selectedItemTrack,
+    setSelectedItem,
   } = useEditorUiStore()
 
   const [billingData, setBillingData] = useState<BillingData | null>(null)
+  const [isAddItemPanelOpen, setIsAddItemPanelOpen] = useState(false)
   const [projectStyle, setProjectStyle] = useState<ProjectResponse['project']['style']>(null)
   const [subtitleDisplaySettings, setSubtitleDisplaySettings] = useState<SubtitleDisplaySettings>(
     DEFAULT_SUBTITLE_DISPLAY_SETTINGS,
@@ -263,6 +274,25 @@ export default function EditPage() {
           chatMessages: createInitialMessages(),
         })
 
+        if (project.compositionData) {
+          compositionStore.hydrateFromServer(project.compositionData)
+        } else {
+          compositionStore.hydrateFromLegacy({
+            video: editorVideo
+              ? {
+                  id: editorVideo.id,
+                  previewUrl: editorVideo.previewUrl,
+                  storagePath: editorVideo.storagePath,
+                  duration: editorVideo.duration,
+                  silenceRegions: editorVideo.silenceRegions,
+                }
+              : null,
+            subtitles: normalizedSubtitles,
+            cutApplied: isSilenceSuggestionApplied,
+            durationSeconds: nextDurationSeconds,
+          })
+        }
+
         setProjectStyle(project.style ?? null)
         setSubtitleDisplaySettings(
           getSubtitleDisplaySettings(
@@ -280,6 +310,7 @@ export default function EditPage() {
     }
 
     void loadProject()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrateProject, projectId])
 
   useEffect(() => {
@@ -316,6 +347,34 @@ export default function EditPage() {
       }
     }
   }, [isLoading, isPlaying, playheadSeconds, projectId, scrollPosition, setLastSavedAt, zoomLevel])
+
+  useEffect(() => {
+    if (!projectId || !hasHydratedRef.current) return
+    if (!compositionStore.isDirty) return
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/timeline`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currentTime: playheadSeconds,
+            zoomLevel,
+            scrollPosition,
+            compositionData: compositionStore.toJSON(),
+          }),
+        })
+        if (response.ok) {
+          compositionStore.markClean()
+          setLastSavedAt(new Date())
+        }
+      } catch (saveError) {
+        console.error('composition save error', saveError)
+      }
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [compositionStore.isDirty, compositionStore.compositionData, projectId, playheadSeconds, zoomLevel, scrollPosition, setLastSavedAt, compositionStore])
 
   const lastSavedText = (() => {
     if (isSaving) return '保存中...'
@@ -653,6 +712,78 @@ export default function EditPage() {
     })()
   }
 
+  // --- Multi-track timeline handlers ---
+  const handleSelectItem = (itemId: string | null, track: TrackName | null) => {
+    setSelectedItem(itemId, track)
+  }
+
+  const handleMoveItem = (track: TrackName, itemId: string, newStartTime: number) => {
+    const item = compositionStore.getItemById(track, itemId) as { startTime?: number; endTime?: number; startMs?: number; endMs?: number } | undefined
+    if (!item) return
+
+    if (track === 'captionTrack') {
+      const oldStartMs = item.startMs ?? 0
+      const oldEndMs = item.endMs ?? 0
+      const durationMs = oldEndMs - oldStartMs
+      const newStartMs = newStartTime * 1000
+      compositionStore.applyPatches([{
+        op: 'update_item',
+        track,
+        itemId,
+        fields: { startMs: newStartMs, endMs: newStartMs + durationMs },
+      }])
+    } else {
+      const oldStart = item.startTime ?? 0
+      const oldEnd = item.endTime ?? 0
+      const duration = oldEnd - oldStart
+      compositionStore.applyPatches([{
+        op: 'update_item',
+        track,
+        itemId,
+        fields: { startTime: newStartTime, endTime: newStartTime + duration },
+      }])
+    }
+  }
+
+  const handleResizeItem = (track: TrackName, itemId: string, newStartTime: number, newEndTime: number) => {
+    if (track === 'captionTrack') {
+      compositionStore.applyPatches([{
+        op: 'update_item',
+        track,
+        itemId,
+        fields: { startMs: newStartTime * 1000, endMs: newEndTime * 1000 },
+      }])
+    } else {
+      compositionStore.applyPatches([{
+        op: 'update_item',
+        track,
+        itemId,
+        fields: { startTime: newStartTime, endTime: newEndTime },
+      }])
+    }
+  }
+
+  const handleUpdateItem = (track: TrackName, itemId: string, fields: Record<string, unknown>) => {
+    compositionStore.applyPatches([{
+      op: 'update_item',
+      track,
+      itemId,
+      fields,
+    }])
+  }
+
+  const handleAddItem = (track: TrackName, item: Record<string, unknown>) => {
+    compositionStore.applyPatches([{
+      op: 'add_item',
+      track,
+      item,
+    }])
+  }
+
+  const selectedItemData = selectedItemId && selectedItemTrack
+    ? (compositionStore.getItemById(selectedItemTrack, selectedItemId) as Record<string, unknown> | undefined) ?? null
+    : null
+
   const handleExport = async (settings: ExportSettings) => {
     if (!projectId) return
 
@@ -839,30 +970,59 @@ export default function EditPage() {
           </Separator>
 
           <Panel defaultSize={60} minSize={42}>
-            <div className="h-full overflow-hidden bg-[#14100e] px-2 pb-2 pt-2">
-              <div className="h-full overflow-hidden rounded-[24px] border border-[#3a291f] shadow-[0_18px_42px_rgba(0,0,0,0.2)]">
-                <EditorTimeline
-                  video={primaryVideo}
-                  subtitles={subtitles}
-                  markers={markers}
-                  selectedSubtitleId={selectedSubtitleId}
-                  durationSeconds={durationSeconds}
-                  playheadSeconds={playheadSeconds}
-                  zoomLevel={zoomLevel}
-                  scrollPosition={scrollPosition}
-                  cutApplied={cutApplied}
-                  onPlayheadChange={setPlayheadSeconds}
-                  onZoomChange={setZoomLevel}
-                  onScrollPositionChange={setScrollPosition}
-                  onSelectSubtitle={(index) => {
-                    selectSubtitleById(subtitles[index]?.id ?? null)
-                  }}
-                  onEditSubtitle={(index) => {
-                    selectSubtitleById(subtitles[index]?.id ?? null)
-                    openSubtitleModal(index)
-                  }}
+            <div className="flex h-full overflow-hidden bg-[#14100e] px-2 pb-2 pt-2">
+              {/* Multi-track timeline */}
+              <div className="flex-1 overflow-hidden rounded-l-[24px] border border-r-0 border-[#3a291f] shadow-[0_18px_42px_rgba(0,0,0,0.2)]">
+                <div className="flex h-full flex-col">
+                  {/* Timeline toolbar */}
+                  <div className="flex items-center justify-between border-b border-white/10 bg-[#211b18] px-3 py-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Multi-Track</span>
+                    <button
+                      type="button"
+                      className="rounded px-2 py-1 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white"
+                      onClick={() => setIsAddItemPanelOpen(!isAddItemPanelOpen)}
+                    >
+                      + 追加
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <MultiTrackTimeline
+                      compositionData={compositionStore.compositionData}
+                      durationSeconds={durationSeconds}
+                      playheadSeconds={playheadSeconds}
+                      zoomLevel={zoomLevel}
+                      scrollPosition={scrollPosition}
+                      selectedItemId={selectedItemId}
+                      selectedItemTrack={selectedItemTrack}
+                      onPlayheadChange={setPlayheadSeconds}
+                      onZoomChange={setZoomLevel}
+                      onScrollPositionChange={setScrollPosition}
+                      onSelectItem={handleSelectItem}
+                      onMoveItem={handleMoveItem}
+                      onResizeItem={handleResizeItem}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Property panel */}
+              <div className="w-[240px] min-w-[240px] overflow-hidden rounded-r-[24px] border border-[#3a291f] shadow-[0_18px_42px_rgba(0,0,0,0.2)]">
+                <PropertyPanel
+                  selectedItem={selectedItemData}
+                  selectedTrack={selectedItemTrack}
+                  onUpdateItem={handleUpdateItem}
                 />
               </div>
+
+              {/* Add item side panel */}
+              {isAddItemPanelOpen && (
+                <AddItemPanel
+                  isOpen={isAddItemPanelOpen}
+                  onClose={() => setIsAddItemPanelOpen(false)}
+                  onAddItem={handleAddItem}
+                  playheadSeconds={playheadSeconds}
+                />
+              )}
             </div>
           </Panel>
         </Group>

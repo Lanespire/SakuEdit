@@ -1,6 +1,8 @@
 import { Composition } from 'remotion'
 import { EDITOR_FPS, getDurationInFrames, getPlaybackSegments } from '../lib/editor'
+import { createEmptyCompositionData, type CompositionData } from '../lib/composition-data'
 import { VideoComposition, type VideoCompositionProps } from './compositions/VideoComposition'
+import { UniversalComposition, type UniversalCompositionProps } from './compositions/UniversalComposition'
 
 type RemotionCompositionProps = VideoCompositionProps & {
   renderConfig?: {
@@ -51,6 +53,27 @@ export const RemotionRoot: React.FC = () => {
             fps,
             width,
             height,
+          }
+        }}
+      />
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <Composition
+        id="UniversalComposition"
+        component={UniversalComposition as any}
+        fps={EDITOR_FPS}
+        width={DEFAULT_WIDTH}
+        height={DEFAULT_HEIGHT}
+        defaultProps={{
+          compositionData: createEmptyCompositionData(10),
+        } as any}
+        durationInFrames={getDurationInFrames(10)}
+        calculateMetadata={({ props }: { props: Record<string, unknown> }) => {
+          const data = (props as unknown as UniversalCompositionProps).compositionData
+          return {
+            fps: data.meta.fps,
+            width: data.meta.width,
+            height: data.meta.height,
+            durationInFrames: Math.max(1, Math.ceil(data.meta.durationSeconds * data.meta.fps)),
           }
         }}
       />

@@ -9,6 +9,29 @@ import {
   generateWaveformWithMediabunny,
   getMediaDurationWithMediabunny,
   getMediaMetadataWithMediabunny,
+  getDetailedMediaInfo,
+  canProcessInBrowser,
+  extractFrameAtTimestamp,
+  extractFramesAtTimestamps,
+  extractAudioBuffer,
+  convertVideoWithMediabunny,
+  embedSubtitlesWithMediabunny,
+} from './mediabunny-adapter'
+export {
+  getDetailedMediaInfo,
+  canProcessInBrowser,
+  extractFrameAtTimestamp,
+  extractFramesAtTimestamps,
+  extractAudioBuffer,
+  convertVideoWithMediabunny,
+  embedSubtitlesWithMediabunny,
+}
+export type {
+  DetailedMediaInfo,
+  ConvertVideoOptions,
+  ConvertVideoResult,
+  ExtractedFrame,
+  EmbedSubtitlesOptions,
 } from './mediabunny-adapter'
 import { serializeSegmentsToSrt } from './remotion-captions-adapter'
 
