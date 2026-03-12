@@ -162,6 +162,9 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  // Composition data (JSON string, source of truth for all editing state)
+  compositionData String?
+
   // Processing progress (指摘#3対応)
   progress    Int           @default(0)
   progressMessage String?
