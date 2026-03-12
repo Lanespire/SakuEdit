@@ -23,9 +23,13 @@ const protectedPrefixes = [
   '/projects',
   '/edit/',
   '/processing/',
+  '/home',
   '/styles',
+  '/style-analysis',
   '/api/projects',
   '/api/export',
+  '/api/analyze',
+  '/api/process',
 ]
 
 // Check if path is public

@@ -1,10 +1,17 @@
 import { NextRequest } from 'next/server'
 import { analyzeStyle, analyzeVisualStyle, transcribeAudio, generateSubtitles } from '@/lib/ai'
 import { downloadFromYouTube, extractAudio, sampleVideoForStyleAnalysis } from '@/lib/video-processor'
-import { prisma } from '@/lib/db'
+import prisma from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
-import { handleRoute, notFound, ok, parseJson } from '@/lib/server/route'
+import {
+  forbidden,
+  getRequiredUserId,
+  handleRoute,
+  notFound,
+  ok,
+  parseJson,
+} from '@/lib/server/route'
 
 const youtubeUrlSchema = z
   .url()
@@ -14,29 +21,48 @@ const youtubeUrlSchema = z
   )
 
 const analyzeRequestSchema = z.object({
-  projectId: z.string().trim().min(1, 'Project ID and reference URL are required'),
+  projectId: z.string().trim().min(1).optional(),
   referenceUrl: youtubeUrlSchema,
 })
 
 export const POST = handleRoute(async (request: NextRequest) => {
   const analysisWindowSeconds = 90
+  const userId = await getRequiredUserId(request)
 
   const { projectId, referenceUrl } = await parseJson(request, analyzeRequestSchema)
+  const isTemporaryProject = !projectId
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      videos: true,
-    },
-  })
+  const project = projectId
+    ? await prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          videos: true,
+        },
+      })
+    : await prisma.project.create({
+        data: {
+          userId,
+          name: 'Style learning scratch',
+          status: 'ANALYZING',
+          progress: 0,
+          progressMessage: 'Style analysis in progress',
+        },
+        include: {
+          videos: true,
+        },
+      })
 
   if (!project) {
     notFound('Project not found')
   }
 
+  if (project.userId !== userId) {
+    forbidden('Project not found')
+  }
+
   const downloadResult = await downloadFromYouTube(
     referenceUrl,
-    `${projectId}-reference`,
+    `${project.id}-reference`,
     'reference.mp4',
   )
 
@@ -80,7 +106,7 @@ export const POST = handleRoute(async (request: NextRequest) => {
   try {
     const styleSample = await sampleVideoForStyleAnalysis(
       downloadResult.inputPath,
-      `${projectId}-reference`,
+      `${project.id}-reference`,
       {
         analysisDuration: analysisWindowSeconds,
         maxFrames: 8,
@@ -120,51 +146,56 @@ export const POST = handleRoute(async (request: NextRequest) => {
     },
   })
 
-  await prisma.analysisJob.create({
-    data: {
-      projectId,
-      status: 'COMPLETED',
-      progress: 100,
-      progressMessage: 'Style analysis completed',
-      referenceUrl,
-      result: styleAnalysis as Prisma.InputJsonValue,
-      startedAt: new Date(),
-      completedAt: new Date(),
-    },
-  })
+  if (!isTemporaryProject) {
+    await prisma.analysisJob.create({
+      data: {
+        projectId: project.id,
+        status: 'COMPLETED',
+        progress: 100,
+        progressMessage: 'Style analysis completed',
+        referenceUrl,
+        result: styleAnalysis as Prisma.InputJsonValue,
+        startedAt: new Date(),
+        completedAt: new Date(),
+      },
+    })
 
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { styleId: style.id },
-  })
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { styleId: style.id },
+    })
 
-  const subtitles = await generateSubtitles(
-    transcript,
-    segments,
-    styleAnalysis.subtitleSettings,
-  )
+    const subtitles = await generateSubtitles(
+      transcript,
+      segments,
+      styleAnalysis.subtitleSettings,
+    )
 
-  await prisma.subtitle.createMany({
-    data: subtitles.map((sub) => ({
-      projectId,
-      startTime: sub.start,
-      endTime: sub.end,
-      text: sub.text,
-      style: 'default',
-      position: styleAnalysis.subtitleSettings.position,
-      fontSize: styleAnalysis.subtitleSettings.size,
-      fontColor: styleAnalysis.subtitleSettings.color,
-      backgroundColor: styleAnalysis.subtitleSettings.backgroundColor,
-      isBold: false,
-    })),
-  })
+    await prisma.subtitle.createMany({
+      data: subtitles.map((sub) => ({
+        projectId: project.id,
+        startTime: sub.start,
+        endTime: sub.end,
+        text: sub.text,
+        style: 'default',
+        position: styleAnalysis.subtitleSettings.position,
+        fontSize: styleAnalysis.subtitleSettings.size,
+        fontColor: styleAnalysis.subtitleSettings.color,
+        backgroundColor: styleAnalysis.subtitleSettings.backgroundColor,
+        isBold: false,
+      })),
+    })
+  } else {
+    await prisma.project.delete({
+      where: { id: project.id },
+    })
+  }
 
   return ok({
     success: true,
-    projectId,
+    projectId: project.id,
     styleId: style.id,
     analysis: styleAnalysis,
-    subtitles,
     message: 'Style analysis completed',
   })
 }, { onError: 'Failed to analyze style' })

@@ -158,6 +158,7 @@ export async function POST(request: NextRequest) {
     // Process export (synchronous for local dev, should be async in production)
     try {
       const inputPath = project.videos[0].storagePath
+      console.log(`[export] Starting export for project ${projectId}, input: ${inputPath}`)
       const outputDir = path.join(UPLOAD_DIR, 'exports', projectId)
       await fs.mkdir(outputDir, { recursive: true })
 
@@ -171,6 +172,8 @@ export async function POST(request: NextRequest) {
         endTime: (sub.endTime ?? 0) / 1000,
       }))
 
+      console.log(`[export] Running FFmpeg: ${quality} ${format}, ${subtitles.length} subtitles`)
+      const exportStartTime = Date.now()
       // Run FFmpeg export with quality and optional subtitle burn-in
       const exportResult = await exportVideo(inputPath, outputPath, {
         quality,
@@ -179,6 +182,7 @@ export async function POST(request: NextRequest) {
         burnSubtitles: subtitleOption === 'burn' || subtitleOption === 'both',
       })
 
+      console.log(`[export] FFmpeg completed in ${((Date.now() - exportStartTime) / 1000).toFixed(1)}s, success: ${exportResult.success}`)
       if (!exportResult.success) {
         throw new Error(exportResult.error || 'Video export failed')
       }

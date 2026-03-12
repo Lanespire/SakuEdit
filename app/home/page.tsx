@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Header } from '@/components/layout'
 import { useSession } from '@/lib/auth-client'
 
 async function readJsonSafely<T>(response: Response): Promise<T | null> {
@@ -109,6 +109,7 @@ export default function HomePage() {
       formData.append('projectId', project.id)
       formData.append('file', selectedFile)
       formData.append('sourceType', 'upload')
+      formData.append('autoProcess', 'false')
 
       const uploadRes = await fetch('/api/upload', {
         method: 'POST',
@@ -125,24 +126,14 @@ export default function HomePage() {
         throw new Error(uploadData?.error || 'ファイルのアップロードに失敗しました')
       }
 
-      setUploadProgress(60)
+      setUploadProgress(100)
 
-      // 参考動画の分析（ある場合）
-      if (referenceUrl) {
-        await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectId: project.id,
-            referenceUrl,
-          }),
-        })
-      }
+      const styleSelectionUrl =
+        '/styles?projectId=' +
+        encodeURIComponent(project.id) +
+        (referenceUrl ? `&youtubeUrl=${encodeURIComponent(referenceUrl)}` : '')
 
-      setUploadProgress(80)
-
-      // 処理中画面へ遷移
-      router.push(`/processing/${project.id}`)
+      router.push(styleSelectionUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラーが発生しました')
     } finally {
@@ -152,42 +143,10 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark">
-      {/* Navigation */}
-      <nav className="border-b border-[#f0e6df] dark:border-[#3a2a20] backdrop-blur-sm bg-white/80 dark:bg-[#231810]/80 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center gap-2" data-test-id="header-logo">
-              <span className="text-2xl">🎬</span>
-              <span className="text-xl font-bold text-[#2d1f18] dark:text-white">SakuEdit</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/projects"
-                className="text-sm text-[#8a756b] hover:text-primary transition-colors"
-                data-test-id="projects-link"
-              >
-                プロジェクト
-              </Link>
-              {session ? (
-                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
-                  {session.user?.name?.[0] || 'U'}
-                </div>
-              ) : (
-                <Link
-                  href="/auth/signin"
-                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
-                  data-test-id="login-link"
-                >
-                  ログイン
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Header currentPage="edit" />
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 py-12">
+      <main className="max-w-5xl mx-auto px-4 py-12 pt-24">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-[#2d1f18] dark:text-white mb-4">
             新しいプロジェクト
@@ -329,7 +288,7 @@ export default function HomePage() {
             ) : (
               <span className="flex items-center gap-2">
                 <span className="material-symbols-outlined">auto_fix_high</span>
-                AIで編集をはじめる
+                スタイル選択へ進む
               </span>
             )}
           </button>

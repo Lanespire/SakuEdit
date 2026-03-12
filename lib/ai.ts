@@ -22,18 +22,18 @@ const openrouter = createOpenAI({
 
 // Model configurations
 const MODELS = {
-  // Gemini Flash (free tier available, fast, good quality)
-  geminiFlash: 'google/gemini-2.0-flash-exp:free',
-  // Gemini Flash 001 (paid, production-ready)
-  geminiFlashPaid: 'google/gemini-2.0-flash-001',
-  // Fallback to Gemini Pro
-  geminiPro: 'google/gemini-2.0-pro-exp-02-05:free',
+  // Gemini 3.1 Flash Lite (cost-efficient, high-volume)
+  geminiFlashLite: 'google/gemini-3.1-flash-lite-preview',
+  // Gemini 3 Flash (fast, good quality)
+  geminiFlash: 'google/gemini-3-flash-preview',
+  // Gemini 3.1 Pro (frontier reasoning, 1M context)
+  geminiPro: 'google/gemini-3.1-pro-preview',
 } as const
 
-// Default model for anonymous users (free tier)
-const DEFAULT_MODEL = MODELS.geminiFlash
+// Default model for anonymous users (cost-efficient)
+const DEFAULT_MODEL = MODELS.geminiFlashLite
 // Model for logged-in/paid users
-const PREMIUM_MODEL = MODELS.geminiFlashPaid
+const PREMIUM_MODEL = MODELS.geminiFlash
 
 function sanitizeApiKey(value?: string): string | undefined {
   const trimmed = value?.trim()
@@ -477,9 +477,11 @@ async function transcribeWithDeepgram(audioPath: string, language: string): Prom
   if (words.length > 0) {
     const start = words[0]?.start ?? 0
     const end = words[words.length - 1]?.end ?? start
+    // Japanese text should not have spaces between words
+    const separator = /^(ja|zh|ko)/.test(language) ? '' : ' '
     const text = words
       .map((word) => word.word || '')
-      .join(' ')
+      .join(separator)
       .trim()
 
     return {

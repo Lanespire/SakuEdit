@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
     const projectId = formData.get('projectId') as string | null
     const sourceType = (formData.get('sourceType') as string) || 'upload'
     const originalUrl = formData.get('url') as string | null
+    const autoProcess = formData.get('autoProcess') !== 'false'
 
     // Handle URL-based upload (YouTube, TikTok)
     if (originalUrl && !file) {
@@ -135,16 +136,21 @@ export async function POST(request: NextRequest) {
       await prisma.project.update({
         where: { id: projectId },
         data: {
-          status: 'QUEUED',
+          status: autoProcess ? 'QUEUED' : 'DRAFT',
           progress: 0,
-          progressMessage: '処理キューに追加しました',
+          progressMessage: autoProcess ? '処理キューに追加しました' : 'スタイルを選択してください',
           lastError: null,
         },
       })
 
-      queueProcessing(request, projectId, { projectId, sourceUrl: originalUrl })
+      if (autoProcess) {
+        queueProcessing(request, projectId, { projectId, sourceUrl: originalUrl })
+      }
 
-      return NextResponse.json({ video, status: 'processing' }, { status: 202 })
+      return NextResponse.json(
+        { video, status: autoProcess ? 'processing' : 'uploaded' },
+        { status: autoProcess ? 202 : 200 }
+      )
     }
 
     // Handle file upload
@@ -208,19 +214,23 @@ export async function POST(request: NextRequest) {
     await prisma.project.update({
       where: { id: projectId },
       data: {
-        status: 'QUEUED',
+        status: autoProcess ? 'QUEUED' : 'DRAFT',
         progress: 0,
-        progressMessage: '処理キューに追加しました',
+        progressMessage: autoProcess ? '処理キューに追加しました' : 'スタイルを選択してください',
         lastError: null,
       },
     })
 
-    queueProcessing(request, projectId, { projectId })
+    if (autoProcess) {
+      queueProcessing(request, projectId, { projectId })
+    }
 
     return NextResponse.json({
       video,
-      status: 'uploaded',
-      message: 'Video uploaded successfully. Processing will begin shortly.',
+      status: autoProcess ? 'processing' : 'uploaded',
+      message: autoProcess
+        ? 'Video uploaded successfully. Processing will begin shortly.'
+        : 'Video uploaded successfully. Choose a style to continue.',
     })
   } catch (error) {
     console.error('Error uploading video:', error)
