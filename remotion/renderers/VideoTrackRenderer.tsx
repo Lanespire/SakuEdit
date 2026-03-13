@@ -20,6 +20,26 @@ const OBJECT_FIT_MAP: Record<string, React.CSSProperties['objectFit']> = {
   fill: 'fill',
 }
 
+function getVideoVolume(frame: number, totalDurationFrames: number, targetVolume: number) {
+  if (totalDurationFrames <= 1) {
+    return targetVolume
+  }
+
+  if (totalDurationFrames <= 12) {
+    return interpolate(frame, [0, totalDurationFrames / 2, totalDurationFrames], [0, targetVolume, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    })
+  }
+
+  return interpolate(
+    frame,
+    [0, 6, totalDurationFrames - 6, totalDurationFrames],
+    [0, targetVolume, targetVolume, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  )
+}
+
 function VideoItem({ item, fps }: { item: VideoTrackItem; fps: number }) {
   const frame = useCurrentFrame()
   const segments: PlaybackSegment[] =
@@ -41,12 +61,7 @@ function VideoItem({ item, fps }: { item: VideoTrackItem; fps: number }) {
     : Math.max(1, Math.round(((item.endTime ?? 10) - item.startTime) * fps))
 
   // Volume with fade support
-  const vol = interpolate(
-    frame,
-    [0, 6, Math.max(7, totalDurationFrames - 6), totalDurationFrames],
-    [0, item.volume, item.volume, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  )
+  const vol = getVideoVolume(frame, totalDurationFrames, item.volume)
 
   return (
     <AbsoluteFill style={{ opacity: item.opacity }}>

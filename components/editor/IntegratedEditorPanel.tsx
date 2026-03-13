@@ -1,7 +1,7 @@
 'use client'
 
 import TextareaAutosize from 'react-textarea-autosize'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Subtitle } from '@/components/modals'
 import type {
   EditorAISuggestion,
@@ -36,9 +36,10 @@ interface IntegratedEditorPanelProps {
   onOpenStyle: () => void
   onSubtitleDisplayModeChange: (mode: SubtitleDisplayMode) => void
   onSubtitleIntervalSecondsChange: (seconds: number) => void
+  initialTab?: EditorPanelTab
 }
 
-type EditorPanelTab = 'ai' | 'subtitle' | 'marker' | 'display'
+export type EditorPanelTab = 'ai' | 'subtitle' | 'marker' | 'display'
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
@@ -117,9 +118,17 @@ export default function IntegratedEditorPanel({
   onOpenStyle,
   onSubtitleDisplayModeChange,
   onSubtitleIntervalSecondsChange,
+  initialTab,
 }: IntegratedEditorPanelProps) {
   const [prompt, setPrompt] = useState('')
-  const [activeTab, setActiveTab] = useState<EditorPanelTab>('ai')
+  const [activeTab, setActiveTab] = useState<EditorPanelTab>(initialTab ?? 'ai')
+
+  // 外部からタブが変更された場合に同期
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab])
 
   const currentSubtitleIndex = useMemo(
     () => subtitles.findIndex((subtitle) => subtitle.id === selectedSubtitleId),

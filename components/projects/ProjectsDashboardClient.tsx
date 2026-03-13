@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { z } from 'zod'
 import { Header } from '@/components/layout'
 import { useSWR } from '@/lib/client/swr'
+import { getProjectDisplayStatus } from '@/lib/project-status'
 import {
   useProjectsFilterStore,
   type ProjectsFilter,
@@ -23,6 +24,9 @@ const projectSchema = z.object({
   id: z.string(),
   name: z.string(),
   status: z.string(),
+  progress: z.number().nullable().optional(),
+  lastError: z.string().nullable().optional(),
+  selectedThumbnailId: z.string().nullable().optional(),
   updatedAt: z.string().or(z.date()).optional(),
   createdAt: z.string().or(z.date()),
   style: z
@@ -100,11 +104,7 @@ function formatMinutes(value: number) {
 }
 
 function getProjectHref(project: Project) {
-  const processingStatuses = new Set(['PROCESSING', 'QUEUED', 'UPLOADING', 'ANALYZING'])
-
-  return processingStatuses.has(project.status)
-    ? `/processing/${project.id}`
-    : `/edit/${project.id}`
+  return `/edit/${project.id}`
 }
 
 function getStatusBadge(status: string) {
@@ -141,6 +141,14 @@ function getProjectActionLabel(status: string) {
     default:
       return '再開'
   }
+}
+
+function getNormalizedStatus(project: Project) {
+  return getProjectDisplayStatus({
+    status: project.status,
+    progress: project.progress,
+    lastError: project.lastError,
+  })
 }
 
 async function loadProjects(url: string) {
@@ -289,11 +297,17 @@ function ProjectCard({
   project: Project
   index: number
 }) {
-  const statusBadge = getStatusBadge(project.status)
+  const normalizedStatus = getNormalizedStatus(project)
+  const statusBadge = getStatusBadge(normalizedStatus)
   const primaryVideo = project.videos[0]
   const footerLabel = project.style?.name ?? 'スタイル未設定'
-  const actionLabel = getProjectActionLabel(project.status)
+  const actionLabel = getProjectActionLabel(normalizedStatus)
   const gradient = previewGradients[index % previewGradients.length]
+
+  // 代表サムネイル: selectedThumbnailId 優先、なければ video.thumbnailUrl
+  const thumbnailSrc = project.selectedThumbnailId
+    ? `/api/thumbnail/generated/${project.selectedThumbnailId}`
+    : primaryVideo?.thumbnailUrl ?? null
 
   return (
     <Link
@@ -301,9 +315,9 @@ function ProjectCard({
       className="group overflow-hidden rounded-[24px] border border-[#e9d9ce] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md"
     >
       <div className="relative aspect-video overflow-hidden border-b border-[#f6ede7]">
-        {primaryVideo?.thumbnailUrl ? (
+        {thumbnailSrc ? (
           <Image
-            src={primaryVideo.thumbnailUrl}
+            src={thumbnailSrc}
             alt={project.name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
@@ -346,7 +360,7 @@ function ProjectCard({
 
           <span
             className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-colors ${
-              project.status === 'COMPLETED'
+              normalizedStatus === 'COMPLETED'
                 ? 'bg-[#1c130d] text-white group-hover:bg-primary'
                 : 'border border-[#ead9cd] text-[#6b584b] group-hover:border-primary group-hover:text-primary'
             }`}
@@ -366,12 +380,17 @@ export default function ProjectsDashboardClient({
 }) {
   const status = useProjectsFilterStore((state) => state.status)
   const setStatus = useProjectsFilterStore((state) => state.setStatus)
-  const query = status === 'ALL' ? '/api/projects' : `/api/projects?status=${status}`
-  const { data, error, isLoading } = useSWR(query, loadProjects, {
+  const { data, error, isLoading } = useSWR('/api/projects', loadProjects, {
     revalidateOnFocus: false,
   })
 
-  const projects = data?.projects ?? []
+  const projects = (data?.projects ?? []).filter((project) => {
+    if (status === 'ALL') {
+      return true
+    }
+
+    return getNormalizedStatus(project) === status
+  })
 
   return (
     <div className="min-h-screen bg-background-light">

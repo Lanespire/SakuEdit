@@ -21,7 +21,7 @@ const processors = [
   'better-auth / Prisma: 認証、セッション管理、アカウント情報管理',
   'Stripe: 決済、請求、サブスクリプション管理',
   'Amazon Web Services: インフラ運用、動画データ保存、処理基盤の提供',
-  'Deepgram: 音声認識および文字起こし処理',
+  'Remotion whisper-cpp / ローカル Whisper 実行環境: 音声認識および文字起こし処理',
   'OpenRouter 経由の生成AIモデル: スタイル分析、字幕生成その他AI補助機能',
 ] as const
 

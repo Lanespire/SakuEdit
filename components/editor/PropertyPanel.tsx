@@ -211,12 +211,22 @@ function OverlayFields({
 }) {
   const position = (item.position as { x: number; y: number }) ?? { x: 50, y: 50 }
   const size = (item.size as { width: number; height: number }) ?? { width: 200, height: 200 }
+  const overlayType = (item.overlayType as string) ?? ''
+  const overlayConfig = (item.overlayConfig as Record<string, unknown>) ?? {}
+  const updateOverlayConfig = (fields: Record<string, unknown>) => {
+    onChange({
+      overlayConfig: {
+        ...overlayConfig,
+        ...fields,
+      },
+    })
+  }
 
   return (
     <>
       <FieldRow>
         <FieldLabel>オーバーレイタイプ</FieldLabel>
-        <div className={`${inputClass} bg-white/3 cursor-not-allowed`}>{(item.overlayType as string) ?? '-'}</div>
+        <div className={`${inputClass} bg-white/3 cursor-not-allowed`}>{overlayType || '-'}</div>
       </FieldRow>
       <FieldRow>
         <FieldLabel>X位置: {position.x}</FieldLabel>
@@ -290,6 +300,53 @@ function OverlayFields({
           onChange={(e) => onChange({ opacity: Number(e.target.value) })}
         />
       </FieldRow>
+      {overlayType === 'text' && (
+        <>
+          <FieldRow>
+            <FieldLabel>テキスト</FieldLabel>
+            <textarea
+              className={`${inputClass} min-h-[60px] resize-y`}
+              value={(overlayConfig.text as string) ?? ''}
+              onChange={(e) => updateOverlayConfig({ text: e.target.value })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <FieldLabel>フォントサイズ: {(overlayConfig.fontSize as number) ?? 32}</FieldLabel>
+            <input
+              type="range"
+              className="w-full accent-orange-400"
+              min={12}
+              max={120}
+              step={1}
+              value={(overlayConfig.fontSize as number) ?? 32}
+              onChange={(e) => updateOverlayConfig({ fontSize: Number(e.target.value) })}
+            />
+          </FieldRow>
+          <FieldRow>
+            <FieldLabel>文字色</FieldLabel>
+            <input
+              type="color"
+              className="h-8 w-full rounded border border-white/10 bg-transparent"
+              value={((overlayConfig.color as string) ?? (overlayConfig.fontColor as string) ?? '#FFFFFF') as string}
+              onChange={(e) => updateOverlayConfig({ color: e.target.value, fontColor: e.target.value })}
+            />
+          </FieldRow>
+        </>
+      )}
+      {(overlayType === 'image' ||
+        overlayType === 'gif' ||
+        overlayType === 'lottie' ||
+        overlayType === 'rive') && (
+        <FieldRow>
+          <FieldLabel>ソースURL</FieldLabel>
+          <input
+            type="text"
+            className={inputClass}
+            value={((overlayConfig.src as string) ?? (overlayConfig.sourceUrl as string) ?? '') as string}
+            onChange={(e) => updateOverlayConfig({ src: e.target.value, sourceUrl: e.target.value })}
+          />
+        </FieldRow>
+      )}
     </>
   )
 }
@@ -331,8 +388,13 @@ export default function PropertyPanel({ selectedItem, selectedTrack, onUpdateIte
     )
   }
 
-  const startTime = (selectedItem.startTime as number) ?? 0
-  const endTime = (selectedItem.endTime as number) ?? 0
+  const isCaptionTrack = selectedTrack === 'captionTrack'
+  const startTime = isCaptionTrack
+    ? (((selectedItem.startMs as number) ?? 0) / 1000)
+    : ((selectedItem.startTime as number) ?? 0)
+  const endTime = isCaptionTrack
+    ? (((selectedItem.endMs as number) ?? 0) / 1000)
+    : ((selectedItem.endTime as number) ?? 0)
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-[#1a1411]">
@@ -351,7 +413,10 @@ export default function PropertyPanel({ selectedItem, selectedTrack, onUpdateIte
             step={0.1}
             min={0}
             value={startTime}
-            onChange={(e) => handleChange({ startTime: Number(e.target.value) })}
+            onChange={(e) => {
+              const value = Number(e.target.value)
+              handleChange(isCaptionTrack ? { startMs: Math.round(value * 1000) } : { startTime: value })
+            }}
           />
         </FieldRow>
         <FieldRow>
@@ -362,7 +427,10 @@ export default function PropertyPanel({ selectedItem, selectedTrack, onUpdateIte
             step={0.1}
             min={startTime}
             value={endTime}
-            onChange={(e) => handleChange({ endTime: Number(e.target.value) })}
+            onChange={(e) => {
+              const value = Number(e.target.value)
+              handleChange(isCaptionTrack ? { endMs: Math.round(value * 1000) } : { endTime: value })
+            }}
           />
         </FieldRow>
 

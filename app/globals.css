@@ -1,51 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  /* SakuEdit Brand Colors - Based on UI Design */
-  --primary: #f97415;           /* Orange - primary brand */
-  --primary-light: #ff9f5e;     /* Light orange */
-  --primary-dark: #ea580c;      /* Dark orange */
-  --secondary: #ffb57c;         /* Warm secondary orange */
-  --accent: #ffd9bf;            /* Soft peach accent */
+  /* SakuEdit Brand Colors */
+  --primary: #FF6B35;
+  --primary-light: #FF8F66;
+  --primary-dark: #E55A2B;
+  --secondary: #2D3748;
+  --accent: #FF8F66;
 
   /* Background Colors */
-  --background-light: #fcfaf8;
-  --background-dark: #23170f;
+  --background-light: #FFFFFF;
+  --background-dark: #1A202C;
   --background: var(--background-light);
+  --background-alt: #F8FAFC;
 
   /* Surface Colors */
-  --surface-light: #ffffff;
-  --surface-dark: #2a1d15;
-  --surface-darker: #1a110a;
+  --surface-light: #FFFFFF;
+  --surface-dark: #2D3748;
+  --surface-darker: #1A202C;
   --surface: var(--surface-light);
-  --surface-hover: #f7efe8;
+  --surface-hover: #F1F5F9;
 
   /* Text Colors */
-  --text-main: #1c130d;
-  --text-sub: #9e6b47;
-  --text-muted: #6b584b;
+  --text-main: #1A202C;
+  --text-sub: #4A5568;
+  --text-muted: #718096;
   --foreground: var(--text-main);
   --muted: var(--text-muted);
 
   /* Border Colors */
-  --border-main: #f0e6df;
-  --border-dark: #3a2e26;
+  --border-main: #E2E8F0;
+  --border-dark: #4A5568;
   --border: var(--border-main);
 
   /* Semantic Colors */
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #ef4444;
-  --info: #3b82f6;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #3B82F6;
 }
 
 .dark,
 body.dark {
   --background: var(--background-dark);
+  --background-alt: #2D3748;
   --surface: var(--surface-dark);
-  --surface-hover: #36271e;
-  --foreground: #fcfaf8;
-  --muted: #c7a892;
+  --surface-hover: #4A5568;
+  --foreground: #F7FAFC;
+  --muted: #A0AEC0;
   --border: var(--border-dark);
 }
 
@@ -61,6 +63,7 @@ body.dark {
   --color-background: var(--background);
   --color-background-light: var(--background-light);
   --color-background-dark: var(--background-dark);
+  --color-background-alt: var(--background-alt);
 
   /* Surface Colors */
   --color-surface: var(--surface);
@@ -105,7 +108,7 @@ body {
 
 /* Selection */
 ::selection {
-  background: rgba(249, 116, 21, 0.3);
+  background: rgba(255, 107, 53, 0.3);
   color: var(--primary);
 }
 

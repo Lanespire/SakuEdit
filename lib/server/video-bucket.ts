@@ -2,32 +2,26 @@ import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { Resource } from 'sst'
 
 const ONE_HOUR_IN_SECONDS = 60 * 60
 
 let s3Client: S3Client | null = null
 
-function readLinkedBucketName() {
-  const linkedResources = Resource as unknown as Record<string, { name?: string } | undefined>
-  return linkedResources.VideoBucket?.name
-}
-
 export function getVideoBucketName() {
-  const bucketName = process.env.VIDEO_BUCKET_NAME || readLinkedBucketName()
+  const bucketName = process.env.VIDEO_BUCKET_NAME
 
   if (!bucketName) {
-    throw new Error('Video bucket is not configured')
+    throw new Error('VIDEO_BUCKET_NAME is required')
   }
 
   return bucketName
 }
 
 export function getAwsRegion() {
-  const region = process.env.AWS_REGION
+  const region = process.env.VIDEO_BUCKET_REGION
 
   if (!region) {
-    throw new Error('AWS region is not configured')
+    throw new Error('VIDEO_BUCKET_REGION is required')
   }
 
   return region

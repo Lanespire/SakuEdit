@@ -1,10 +1,15 @@
-import { after, NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import prisma from '@/lib/db'
 import { auth } from '@/lib/auth'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads'
+import { enqueueProjectProcessing } from '@/lib/server/processing-jobs'
+import { dispatchProcessingJobOrMarkFailure } from '@/lib/server/processing-dispatch'
+import {
+  uploadLocalStorageObject,
+  writeProjectAsset,
+} from '@/lib/server/project-storage'
+import { downloadFromYouTube } from '@/lib/video-processor'
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 const ALLOWED_TYPES = [
   'video/mp4',
@@ -14,47 +19,24 @@ const ALLOWED_TYPES = [
   'video/x-matroska',
 ]
 
-async function updateProjectProcessingError(projectId: string, message: string) {
-  await prisma.project.update({
-    where: { id: projectId },
-    data: {
-      status: 'ERROR',
-      progressMessage: '処理の開始に失敗しました',
-      lastError: message,
-    },
-  })
-}
-
-function queueProcessing(
-  request: NextRequest,
+async function queueProcessing(
   projectId: string,
-  payload: Record<string, unknown>,
+  userId: string,
+  options?: Record<string, unknown>,
 ) {
-  after(async () => {
-    try {
-      const cookieHeader = request.headers.get('cookie') || ''
-      const response = await fetch(new URL('/api/process', request.url).toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': cookieHeader,
-        },
-        body: JSON.stringify(payload),
-      })
+  const { job, shouldInvoke } = await enqueueProjectProcessing({
+    projectId,
+    userId,
+    options,
+  })
 
-      if (!response.ok) {
-        const responseText = await response.text()
-        const errorMessage = responseText || `status ${response.status}`
-        console.error('Background processing startup failed:', errorMessage)
-        await updateProjectProcessingError(projectId, `Processing startup failed: ${errorMessage}`)
-      }
-    } catch (error) {
-      console.error('Background processing request failed:', error)
-      await updateProjectProcessingError(
-        projectId,
-        `Processing startup failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      )
-    }
+  if (!shouldInvoke) {
+    return
+  }
+
+  await dispatchProcessingJobOrMarkFailure({
+    job,
+    projectId,
   })
 }
 
@@ -119,23 +101,48 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 })
       }
 
-      // Create project directory: uploads/projects/{projectId}/
-      const projectDir = path.join(UPLOAD_DIR, 'projects', projectId)
-      await mkdir(projectDir, { recursive: true })
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          status: 'UPLOADING',
+          progress: 0,
+          progressMessage: '動画を取得しています',
+          lastError: null,
+        },
+      })
 
-      // Create video record for URL source
+      const downloadResult = await downloadFromYouTube(originalUrl, projectId, 'input.mp4')
+      if (!downloadResult.success || !downloadResult.inputPath) {
+        throw new Error(downloadResult.error || 'Failed to download source video')
+      }
+
+      const storagePath = await uploadLocalStorageObject(
+        `projects/${projectId}/input.mp4`,
+        downloadResult.inputPath,
+        {
+          contentType: 'video/mp4',
+        },
+      )
+
       const video = await prisma.video.create({
         data: {
           projectId,
           sourceType,
-          filename: `url-${Date.now()}.mp4`,
+          filename: `url-import-${Date.now()}.mp4`,
           originalUrl,
-          storagePath: path.join(projectDir, 'input.mp4'), // 同一パス構造
-          duration: 0,
-          fileSize: 0,
+          storagePath,
+          duration: downloadResult.metadata?.duration || 0,
+          width: downloadResult.metadata?.width || null,
+          height: downloadResult.metadata?.height || null,
+          fileSize: (await fs.stat(downloadResult.inputPath)).size,
           mimeType: 'video/mp4',
         },
       })
+
+      await fs.rm(path.dirname(downloadResult.inputPath), {
+        recursive: true,
+        force: true,
+      }).catch(() => undefined)
 
       await prisma.project.update({
         where: { id: projectId },
@@ -148,7 +155,7 @@ export async function POST(request: NextRequest) {
       })
 
       if (autoProcess) {
-        queueProcessing(request, projectId, { projectId, sourceUrl: originalUrl })
+        await queueProcessing(projectId, userId)
       }
 
       return NextResponse.json(
@@ -190,16 +197,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create project directory structure: uploads/projects/{projectId}/
-    const projectDir = path.join(UPLOAD_DIR, 'projects', projectId)
-    await mkdir(projectDir, { recursive: true })
-
-    // Save as input.mp4 (source of truth for process API)
-    const inputPath = path.join(projectDir, 'input.mp4')
-
-    // Write file
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    await writeFile(inputPath, buffer)
+    const inputPath = await writeProjectAsset(projectId, 'input.mp4', buffer, {
+      contentType: file.type,
+    })
 
     // Create video record
     const video = await prisma.video.create({
@@ -226,7 +228,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (autoProcess) {
-      queueProcessing(request, projectId, { projectId })
+      await queueProcessing(projectId, userId)
     }
 
     return NextResponse.json({

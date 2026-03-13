@@ -1,19 +1,16 @@
 // SakuEdit - Prisma Schema
-// Database: PostgreSQL (Neon)
+// Database: SQLite schema + optional Turso/libSQL runtime adapter
 
 generator client {
   provider = "prisma-client-js"
-  // Note: fullTextSearchPostgres is only available for PostgreSQL
-  // For SQLite, use fullTextSearchSQLite if needed
+  engineType = "client"
+  // Runtime can swap to Turso/libSQL via @prisma/adapter-libsql without changing this schema.
 }
 
 datasource db {
   provider  = "sqlite"
   url       = env("DATABASE_URL")
-  // directUrl is not needed for SQLite
-  // For PostgreSQL (Neon), use:
-  // provider  = "postgresql"
-  // directUrl = env("DIRECT_DATABASE_URL")
+  // Runtime uses Turso via @prisma/adapter-libsql. Prisma CLI still requires a file: URL for sqlite schemas.
 }
 
 // ============================================
@@ -174,18 +171,23 @@ model Project {
   retryCount  Int           @default(0)
   lastError   String?
 
+  // サムネイル
+  selectedThumbnailId String?   // 採用サムネイルID（Source of Truth）
+
   // Relations
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   videos      Video[]
   subtitles   Subtitle[]
   exportJobs  ExportJob[]
   analysisJobs AnalysisJob[]
+  processingJobs ProcessingJob[]
   timeline    Timeline?
   markers     Marker[]
   undoHistory UndoSnapshot[]
   aiSuggestions AISuggestion[]
   styleId     String?
   style       Style?        @relation(fields: [styleId], references: [id])
+  thumbnails  Thumbnail[]
 
   @@map("projects")
 }
@@ -227,6 +229,40 @@ model Video {
   project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("videos")
+}
+
+// ============================================
+// Processing Job
+// ============================================
+
+model ProcessingJob {
+  id              String      @id @default(cuid())
+  projectId       String
+  status          JobStatus   @default(QUEUED)
+  progress        Int         @default(0)
+  progressMessage String?
+  requestKey      String
+  pipelineVersion String
+  inputStoragePath String
+  optionsJson     String?
+  outputVideoPath String?
+  audioPath       String?
+  srtPath         String?
+  thumbnailPath   String?
+  error           String?
+  attempt         Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+  canceledAt      DateTime?
+  lastHeartbeatAt DateTime?
+
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, requestKey])
+  @@index([projectId, status])
+  @@map("processing_jobs")
 }
 
 // ============================================
@@ -406,6 +442,47 @@ model Style {
   projects        Project[]
 
   @@map("styles")
+}
+
+// ============================================
+// Thumbnail (AI生成サムネイル)
+// ============================================
+
+model Thumbnail {
+  id          String          @id @default(cuid())
+  projectId   String
+  status      JobStatus       @default(PENDING)
+
+  // 生成設定
+  mode        ThumbnailMode   // テンプレ / 素材UP / 動画フレーム / 参考風
+  templateId  String?         // テンプレート使用時
+  prompt      String          // ユーザー入力テキスト（タイトルなど）
+  stylePrompt String?         // 参考YouTuber風の追加プロンプト
+
+  // 入力素材
+  inputImages String?         // JSON: [{path, type: "upload"|"frame"|"reference"}]
+
+  // 生成結果
+  imageUrl    String?         // 表示用URL (/api/thumbnail/generated/[id])
+  imagePath   String?         // ディスク上のパス
+  width       Int             @default(1280)
+  height      Int             @default(720)
+
+  // メタ
+  error       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("thumbnails")
+}
+
+enum ThumbnailMode {
+  TEMPLATE      // テンプレートから生成
+  UPLOAD        // 自分の素材をベースに生成
+  VIDEO_FRAME   // 動画フレームをベースに生成
+  REFERENCE     // 参考YouTuberのスタイルで生成
 }
 
 // ============================================

@@ -55,30 +55,70 @@ function LightLeakEffect({ config }: { config: Record<string, unknown> }) {
   )
 }
 
-// --- Camera Motion Blur (wraps children = placeholder) ---
+// --- Camera Motion Blur (animated circles give the blur something visible to act on) ---
 function CameraMotionBlurEffect({ config }: { config: Record<string, unknown> }) {
+  const frame = useCurrentFrame()
+  const { width, height, durationInFrames } = useVideoConfig()
   const shutterAngle = (config.shutterAngle as number) ?? 180
   const samples = (config.samples as number) ?? 10
+  const color = (config.color as string) ?? 'rgba(255,255,255,0.7)'
+  const circleCount = (config.circleCount as number) ?? 5
+
+  const progress = interpolate(frame, [0, durationInFrames], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  })
+
+  const circles = Array.from({ length: circleCount }, (_, i) => {
+    const phase = i / circleCount
+    const cx = width * 0.1 + (width * 0.8 * ((progress + phase) % 1))
+    const cy = height * 0.3 + height * 0.4 * Math.sin((progress + phase) * Math.PI * 2)
+    const r = 20 + 15 * Math.sin((progress + phase * 0.7) * Math.PI * 4)
+    return { cx, cy, r, key: i }
+  })
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <CameraMotionBlur shutterAngle={shutterAngle} samples={samples}>
-        <AbsoluteFill style={{ backgroundColor: 'rgba(255,255,255,0.02)' }} />
+        <AbsoluteFill>
+          <svg width={width} height={height} style={{ position: 'absolute', inset: 0 }}>
+            {circles.map((c) => (
+              <circle key={c.key} cx={c.cx} cy={c.cy} r={c.r} fill={color} />
+            ))}
+          </svg>
+        </AbsoluteFill>
       </CameraMotionBlur>
     </AbsoluteFill>
   )
 }
 
-// --- Trail ---
+// --- Trail (moving shape gives the trail effect visible content to render ghost frames of) ---
 function TrailEffect({ config }: { config: Record<string, unknown> }) {
+  const frame = useCurrentFrame()
+  const { width, height, durationInFrames } = useVideoConfig()
   const lagInFrames = (config.lagInFrames as number) ?? 3
   const trailOpacity = (config.trailOpacity as number) ?? 0.6
   const layers = (config.layers as number) ?? 5
+  const color = (config.color as string) ?? 'rgba(100,200,255,0.9)'
+  const size = (config.size as number) ?? 40
+
+  const progress = interpolate(frame, [0, durationInFrames], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  })
+
+  // Lissajous-style path so the shape moves in a way that makes the trail clearly visible
+  const cx = width * 0.1 + width * 0.8 * ((Math.sin(progress * Math.PI * 4) + 1) / 2)
+  const cy = height * 0.2 + height * 0.6 * ((Math.sin(progress * Math.PI * 6 + 1) + 1) / 2)
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <Trail lagInFrames={lagInFrames} trailOpacity={trailOpacity} layers={layers}>
-        <AbsoluteFill style={{ backgroundColor: 'rgba(255,255,255,0.02)' }} />
+        <AbsoluteFill>
+          <svg width={width} height={height} style={{ position: 'absolute', inset: 0 }}>
+            <circle cx={cx} cy={cy} r={size / 2} fill={color} />
+          </svg>
+        </AbsoluteFill>
       </Trail>
     </AbsoluteFill>
   )
@@ -124,31 +164,93 @@ function NoiseGradientEffect({ config }: { config: Record<string, unknown> }) {
   )
 }
 
-// --- Audio Visualizer (placeholder) ---
+// --- Audio Visualizer ---
+// Uses noise-based simulation since real audio data requires visualizeAudio() with
+// staticFile references that are not guaranteed to be available at render time.
+// The noise is smoothed with a low-frequency time axis to mimic realistic bar movement.
 function AudioVisualizerEffect({ config }: { config: Record<string, unknown> }) {
   const frame = useCurrentFrame()
   const { width, height } = useVideoConfig()
-  const barCount = (config.barCount as number) ?? 32
+  const barCount = (config.barCount as number) ?? 48
   const color = (config.color as string) ?? '#4ecdc4'
+  const glowColor = (config.glowColor as string) ?? 'rgba(78,205,196,0.4)'
+  const mirrored = (config.mirrored as boolean) ?? false
+  const seed = (config.seed as string) ?? 'viz'
+  const maxBarHeightRatio = (config.maxBarHeightRatio as number) ?? 0.3
+
+  const vizHeight = height * maxBarHeightRatio
   const barWidth = width / barCount
+  const baselineY = vizHeight
+
+  const bars = Array.from({ length: barCount }, (_, i) => {
+    // Two-octave noise sum for a more musical, layered feel
+    const coarse = (noise2D(seed, i * 0.3, frame * 0.04) + 1) / 2
+    const fine = (noise2D(`${seed}-fine`, i * 0.8, frame * 0.09) + 1) / 2
+    const raw = coarse * 0.7 + fine * 0.3
+    // Smooth the edges so the leftmost and rightmost bars taper down
+    const envelope = Math.sin((i / (barCount - 1)) * Math.PI)
+    const barH = raw * envelope * vizHeight
+    return { barH, key: i }
+  })
 
   return (
-    <AbsoluteFill style={{ pointerEvents: 'none', justifyContent: 'flex-end' }}>
-      <svg width={width} height={height * 0.3} style={{ position: 'absolute', bottom: 0 }}>
-        {Array.from({ length: barCount }, (_, i) => {
-          const h = ((noise2D('viz', i * 0.5, frame * 0.05) + 1) / 2) * height * 0.25
-          return (
-            <rect
-              key={i}
-              x={i * barWidth}
-              y={height * 0.3 - h}
-              width={barWidth - 2}
-              height={h}
-              fill={color}
-              opacity={0.8}
-            />
-          )
-        })}
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      <svg width={width} height={vizHeight} style={{ position: 'absolute', bottom: 0 }}>
+        <defs>
+          <filter id="viz-glow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Baseline */}
+        <line x1={0} y1={baselineY} x2={width} y2={baselineY} stroke={color} strokeWidth={1} opacity={0.4} />
+
+        {/* Bars with optional mirror */}
+        <g filter="url(#viz-glow)">
+          {bars.map(({ barH, key: i }) => {
+            const x = i * barWidth
+            const barX = x + 1
+            const bw = Math.max(1, barWidth - 2)
+
+            return (
+              <g key={i}>
+                {/* Main upward bar */}
+                <rect
+                  x={barX}
+                  y={baselineY - barH}
+                  width={bw}
+                  height={barH}
+                  fill={color}
+                  opacity={0.85}
+                />
+                {/* Glow overlay */}
+                <rect
+                  x={barX}
+                  y={baselineY - barH}
+                  width={bw}
+                  height={barH * 0.3}
+                  fill={glowColor}
+                  opacity={0.5}
+                />
+                {/* Mirrored downward bar */}
+                {mirrored && (
+                  <rect
+                    x={barX}
+                    y={baselineY}
+                    width={bw}
+                    height={barH * 0.4}
+                    fill={color}
+                    opacity={0.25}
+                  />
+                )}
+              </g>
+            )
+          })}
+        </g>
       </svg>
     </AbsoluteFill>
   )
@@ -187,7 +289,7 @@ function PathAnimationEffect({ config }: { config: Record<string, unknown> }) {
   )
 }
 
-// --- Transition placeholder ---
+// --- Transition (overlay-based clip/transform transitions between clips) ---
 function TransitionEffect({
   effectType,
   config,
@@ -241,7 +343,7 @@ function TransitionEffect({
 }
 
 // --- Main renderer for a single effect ---
-function EffectItemRenderer({ item, fps }: { item: EffectItem; fps: number }) {
+function EffectItemRenderer({ item }: { item: EffectItem; fps: number }) {
   switch (item.effectType) {
     case 'particle':
       return <ParticleEffect config={item.config} />

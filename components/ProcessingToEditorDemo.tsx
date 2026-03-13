@@ -38,7 +38,7 @@ export function ProcessingToEditorDemo() {
     setState('processing');
     setProgress(0);
 
-    // Smooth progress animation
+    // Smooth progress animation (3 seconds total)
     intervalRef.current = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
@@ -48,14 +48,7 @@ export function ProcessingToEditorDemo() {
         }
         return prev + 1;
       });
-    }, 50); // 5 seconds total
-
-    // Reset for loop
-    setTimeout(() => {
-      setState('processing');
-      setProgress(0);
-      hasStartedRef.current = false;
-    }, 12000);
+    }, 30);
   }, [clearAllTimers]);
 
   useEffect(() => {
@@ -78,9 +71,6 @@ export function ProcessingToEditorDemo() {
 
   return (
     <div ref={containerRef} className="relative w-full min-h-[600px]">
-      {/* Glow Effect */}
-      <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-secondary/20 to-accent/20 rounded-3xl blur-2xl opacity-50 pointer-events-none" />
-
       <AnimatePresence mode="wait">
         {state === 'processing' && (
           <motion.div
@@ -266,13 +256,50 @@ export function ProcessingToEditorDemo() {
               </motion.div>
             </div>
 
-            {/* Editor Screen Mockup */}
+            {/* Editor Screen Mockup (CSS) */}
             <div className="relative">
-              <img
-                src="/edit-screen-mockup.png"
-                alt="編集画面"
-                className="w-full"
-              />
+              <div className="flex bg-[#1a1a2e]">
+                {/* Sidebar */}
+                <div className="w-10 bg-[#16162a] border-r border-white/[0.06] py-3 flex-col items-center gap-2 shrink-0 hidden sm:flex">
+                  {['🎬','📝','🎵','🎨'].map((icon, i) => (
+                    <div key={i} className={`w-6 h-6 rounded flex items-center justify-center text-[10px] ${i === 0 ? 'bg-primary/20' : 'bg-white/[0.04]'}`}>
+                      {icon}
+                    </div>
+                  ))}
+                </div>
+                {/* Main */}
+                <div className="flex-1 min-w-0">
+                  <div className="m-3 rounded-lg bg-[#0d0d1a] aspect-video relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#2a2a3e] to-[#15152a]" />
+                    <div className="absolute bottom-[14%] left-0 right-0 text-center px-4">
+                      <span className="inline-block bg-black/60 text-white px-2.5 py-1 rounded text-xs font-medium">
+                        今日はプログラミングの話をします
+                      </span>
+                    </div>
+                    <div className="absolute bottom-2 left-3 right-3 h-1 bg-white/20 rounded-full">
+                      <div className="h-full w-full bg-primary rounded-full" />
+                    </div>
+                  </div>
+                  <div className="px-3 pb-3 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[8px] text-white/25 w-5 shrink-0">映像</span>
+                      <div className="flex-1 h-4 flex gap-0.5">
+                        <div className="h-full bg-primary/30 rounded-sm flex-[3]" />
+                        <div className="h-full bg-primary/30 rounded-sm flex-[2]" />
+                        <div className="h-full bg-primary/30 rounded-sm flex-[4]" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[8px] text-white/25 w-5 shrink-0">字幕</span>
+                      <div className="flex-1 h-3 flex gap-0.5">
+                        <div className="h-full bg-blue-400/25 rounded-sm flex-[2]" />
+                        <div className="h-full bg-blue-400/25 rounded-sm flex-[1]" />
+                        <div className="h-full bg-blue-400/25 rounded-sm flex-[3]" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Success Animation */}
               <motion.div

@@ -1,7 +1,28 @@
+import { PrismaLibSql } from '@prisma/adapter-libsql'
 import { PrismaClient } from '@prisma/client'
 import { hashPassword } from 'better-auth/crypto'
 
-const prisma = new PrismaClient()
+function createPrismaClient() {
+  const url = process.env.TURSO_DATABASE_URL
+  const authToken = process.env.TURSO_AUTH_TOKEN
+
+  if (!url) {
+    throw new Error('TURSO_DATABASE_URL is required')
+  }
+
+  if (!authToken) {
+    throw new Error('TURSO_AUTH_TOKEN is required')
+  }
+
+  const adapter = new PrismaLibSql({
+    url,
+    authToken,
+  })
+
+  return new PrismaClient({ adapter })
+}
+
+const prisma = createPrismaClient()
 const DEMO_USER_EMAIL = 'demo@sakuedit.local'
 const DEMO_USER_PASSWORD = 'demo123456'
 const DEMO_USER_NAME = 'Demo User'
@@ -13,31 +34,28 @@ async function ensureDemoUser() {
 
   const password = await hashPassword(DEMO_USER_PASSWORD)
 
-  const demoUser = await prisma.user.upsert({
-    where: { email: DEMO_USER_EMAIL },
-    update: {
-      emailVerified: true,
-      name: DEMO_USER_NAME,
+  await prisma.account.deleteMany({
+    where: {
+      user: {
+        email: DEMO_USER_EMAIL,
+      },
     },
-    create: {
+  })
+
+  await prisma.user.deleteMany({
+    where: { email: DEMO_USER_EMAIL },
+  })
+
+  const demoUser = await prisma.user.create({
+    data: {
       email: DEMO_USER_EMAIL,
       name: DEMO_USER_NAME,
       emailVerified: true,
     },
   })
 
-  await prisma.account.upsert({
-    where: {
-      providerId_accountId: {
-        providerId: 'credential',
-        accountId: demoUser.id,
-      },
-    },
-    update: {
-      userId: demoUser.id,
-      password,
-    },
-    create: {
+  await prisma.account.create({
+    data: {
       userId: demoUser.id,
       providerId: 'credential',
       accountId: demoUser.id,

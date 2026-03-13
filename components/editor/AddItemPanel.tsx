@@ -143,7 +143,7 @@ export default function AddItemPanel({ isOpen, onClose, onAddItem, playheadSecon
                   opacity: 1,
                   layer: 0,
                   animation: { type: 'none' },
-                  overlayConfig: { text: '新しいテロップ', fontSize: 32, fontColor: '#FFFFFF' },
+                  overlayConfig: { text: '新しいテロップ', fontSize: 32, color: '#FFFFFF' },
                 })
               }
             />

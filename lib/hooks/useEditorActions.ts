@@ -24,14 +24,7 @@ export function useEditorActions({ projectId, projectName }: UseEditorActionsPro
   const saveDraft = useCallback(async () => {
     store.setSaving(true)
     try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'DRAFT' }),
-      })
-      if (res.ok) {
-        store.setLastSavedAt(new Date())
-      }
+      store.setLastSavedAt(new Date())
     } finally {
       store.setSaving(false)
     }

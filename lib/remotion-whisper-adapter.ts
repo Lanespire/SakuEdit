@@ -1,8 +1,6 @@
 import { promises as fs } from 'fs'
 import * as path from 'path'
 import {
-  downloadWhisperModel,
-  installWhisperCpp,
   toCaptions,
   transcribe,
   type WhisperModel,
@@ -10,10 +8,40 @@ import {
 import type { Language } from '@remotion/install-whisper-cpp'
 import { captionsToSegments } from './remotion-captions-adapter'
 
-const WHISPER_CPP_VERSION = process.env.WHISPER_CPP_VERSION || '1.7.4'
-const WHISPER_MODEL = (process.env.WHISPER_MODEL as WhisperModel | undefined) || 'base'
-const WHISPER_ROOT = process.env.WHISPER_ROOT || path.join(process.cwd(), '.cache', 'remotion-whisper')
-const WHISPER_MODEL_DIR = path.join(WHISPER_ROOT, 'models')
+const DEFAULT_WHISPER_CPP_VERSION = '1.7.4'
+const DEFAULT_WHISPER_MODEL: WhisperModel = 'base'
+
+type WhisperRuntimeConfig = {
+  whisperCppVersion: string
+  whisperModel: WhisperModel
+  whisperRoot: string
+  whisperModelDir: string
+  whisperModelPath: string
+}
+
+function isBuildBinLayout(version: string) {
+  const [major = 0, minor = 0, patch = 0] = version
+    .split('.')
+    .map((part) => Number.parseInt(part, 10) || 0)
+
+  if (major > 1) {
+    return true
+  }
+
+  if (major < 1) {
+    return false
+  }
+
+  if (minor > 7) {
+    return true
+  }
+
+  if (minor < 7) {
+    return false
+  }
+
+  return patch >= 4
+}
 
 export interface RemotionWhisperResult {
   text: string
@@ -24,36 +52,97 @@ export interface RemotionWhisperResult {
   }>
 }
 
-let ensureRuntimePromise: Promise<void> | null = null
+let whisperRuntimePromise: Promise<WhisperRuntimeConfig> | null = null
 
-async function ensureWhisperRuntime() {
-  if (ensureRuntimePromise) {
-    return ensureRuntimePromise
+function getConfiguredWhisperVersion() {
+  return process.env.WHISPER_CPP_VERSION || DEFAULT_WHISPER_CPP_VERSION
+}
+
+function getConfiguredWhisperModel() {
+  return (process.env.WHISPER_MODEL as WhisperModel | undefined) || DEFAULT_WHISPER_MODEL
+}
+
+function getWhisperRootCandidates() {
+  const configuredRoot = process.env.WHISPER_ROOT
+  const processingRuntimeRoot = process.env.PROCESSING_RUNTIME_ROOT
+
+  return [
+    configuredRoot,
+    processingRuntimeRoot ? path.join(processingRuntimeRoot, 'whisper') : null,
+    '/opt/whisper',
+    path.join(process.cwd(), '.cache', 'remotion-whisper'),
+  ].filter((candidate): candidate is string => Boolean(candidate))
+}
+
+function getModelPathCandidates(root: string, whisperModel: WhisperModel) {
+  const configuredModelPath = process.env.WHISPER_MODEL_PATH
+  const configuredModelDir = process.env.WHISPER_MODEL_DIR
+  const fileName = `ggml-${whisperModel}.bin`
+
+  return [
+    configuredModelPath,
+    configuredModelDir ? path.join(configuredModelDir, fileName) : null,
+    path.join(root, 'models', fileName),
+  ].filter((candidate): candidate is string => Boolean(candidate))
+}
+
+async function findAccessiblePath(candidates: string[]) {
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate)
+      return candidate
+    } catch {
+      // Keep searching for a pre-provisioned runtime.
+    }
   }
 
-  ensureRuntimePromise = (async () => {
-    await fs.mkdir(WHISPER_ROOT, { recursive: true })
-    await fs.mkdir(WHISPER_MODEL_DIR, { recursive: true })
+  return null
+}
 
-    await installWhisperCpp({
-      version: WHISPER_CPP_VERSION,
-      to: WHISPER_ROOT,
-      printOutput: false,
-    })
+async function resolveWhisperRuntime() {
+  if (!whisperRuntimePromise) {
+    whisperRuntimePromise = (async () => {
+      const whisperCppVersion = getConfiguredWhisperVersion()
+      const whisperModel = getConfiguredWhisperModel()
 
-    await downloadWhisperModel({
-      model: WHISPER_MODEL,
-      folder: WHISPER_MODEL_DIR,
-      printOutput: false,
-    })
-  })()
+      for (const whisperRoot of getWhisperRootCandidates()) {
+        const whisperExecutablePath = await findAccessiblePath([
+          process.env.WHISPER_EXECUTABLE_PATH || '',
+          isBuildBinLayout(whisperCppVersion)
+            ? path.join(whisperRoot, 'build', 'bin', 'whisper-cli')
+            : path.join(whisperRoot, 'main'),
+        ].filter(Boolean))
+        const whisperModelPath = await findAccessiblePath(
+          getModelPathCandidates(whisperRoot, whisperModel),
+        )
 
-  try {
-    await ensureRuntimePromise
-  } catch (error) {
-    ensureRuntimePromise = null
-    throw error
+        if (!whisperExecutablePath || !whisperModelPath) {
+          continue
+        }
+
+        return {
+          whisperCppVersion,
+          whisperModel,
+          whisperRoot,
+          whisperModelDir: path.dirname(whisperModelPath),
+          whisperModelPath,
+        }
+      }
+
+      throw new Error(
+        [
+          'Whisper runtime is not provisioned.',
+          'Set WHISPER_ROOT/WHISPER_MODEL_PATH to a prebuilt runtime or mount a Lambda Layer under /opt.',
+        ].join(' '),
+      )
+    })()
   }
+
+  return whisperRuntimePromise
+}
+
+export async function verifyWhisperRuntime() {
+  return resolveWhisperRuntime()
 }
 
 export async function transcribeWithRemotionWhisper(
@@ -61,14 +150,14 @@ export async function transcribeWithRemotionWhisper(
   language: string = 'ja',
 ): Promise<RemotionWhisperResult> {
   await fs.access(inputPath)
-  await ensureWhisperRuntime()
+  const runtime = await resolveWhisperRuntime()
 
   const transcription = await transcribe({
     inputPath,
-    whisperPath: WHISPER_ROOT,
-    whisperCppVersion: WHISPER_CPP_VERSION,
-    model: WHISPER_MODEL,
-    modelFolder: WHISPER_MODEL_DIR,
+    whisperPath: runtime.whisperRoot,
+    whisperCppVersion: runtime.whisperCppVersion,
+    model: runtime.whisperModel,
+    modelFolder: runtime.whisperModelDir,
     tokenLevelTimestamps: true,
     printOutput: false,
     language: language as Language,

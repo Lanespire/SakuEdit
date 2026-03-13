@@ -11,6 +11,7 @@ export default $config({
       providers: {
         aws: {
           profile: "sakuedit",
+          region: "ap-northeast-1",
         },
         stripe: {
           version: "0.0.28",
@@ -19,8 +20,44 @@ export default $config({
     };
   },
   async run() {
+    const awsPulumi = await import("@pulumi/aws");
+    const pulumi = await import("@pulumi/pulumi");
     const { createStripeResources } = await import("./infra/stripe");
+    const { prepareVideoProcessingRuntime } = await import("./infra/video-runtime");
     const isDevStage = $app.stage === "dev";
+    const tursoDatabaseUrl = process.env.TURSO_DATABASE_URL;
+    const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
+    const databaseUrl = process.env.DATABASE_URL;
+    const betterAuthUrl = process.env.BETTER_AUTH_URL;
+    const betterAuthSecret = process.env.BETTER_AUTH_SECRET;
+    const processingWorkerToken = betterAuthSecret;
+    const preparedRuntime = await prepareVideoProcessingRuntime();
+    const configuredLayerArns = (process.env.VIDEO_PROCESSOR_LAYER_ARNS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const shouldCreateManagedLayer =
+      !isDevStage && configuredLayerArns.length === 0 && preparedRuntime.canCreateDeployLayer;
+
+    if (!tursoDatabaseUrl) {
+      throw new Error("TURSO_DATABASE_URL is required");
+    }
+
+    if (!tursoAuthToken) {
+      throw new Error("TURSO_AUTH_TOKEN is required");
+    }
+
+    if (!databaseUrl) {
+      throw new Error("DATABASE_URL is required");
+    }
+
+    if (!betterAuthUrl) {
+      throw new Error("BETTER_AUTH_URL is required");
+    }
+
+    if (!betterAuthSecret) {
+      throw new Error("BETTER_AUTH_SECRET is required");
+    }
 
     const stripePublishableKey = new sst.Secret(
       "StripePublishableKey",
@@ -52,25 +89,95 @@ export default $config({
       // Public read for serving processed videos
     });
 
+    const managedVideoProcessorLayer = shouldCreateManagedLayer
+      ? new awsPulumi.lambda.LayerVersion("VideoProcessorRuntimeLayer", {
+          layerName: `sakuedit-${$app.stage}-video-runtime`,
+          description: "ffmpeg/ffprobe/whisper/yt-dlp runtime for VideoProcessor",
+          code: new pulumi.asset.FileArchive(preparedRuntime.runtimeRoot),
+          compatibleArchitectures: [preparedRuntime.layerArchitecture],
+          compatibleRuntimes: ["nodejs22.x"],
+        })
+      : null;
+    const videoProcessorLayers = [
+      ...configuredLayerArns,
+      ...(managedVideoProcessorLayer ? [managedVideoProcessorLayer.arn] : []),
+    ];
+    const resolvedProcessingRuntimeRoot = isDevStage
+      ? preparedRuntime.runtimeRoot
+      : videoProcessorLayers.length > 0
+        ? "/opt"
+        : process.env.PROCESSING_RUNTIME_ROOT;
+    const resolvedWhisperRoot = isDevStage
+      ? preparedRuntime.whisperRoot
+      : videoProcessorLayers.length > 0
+        ? "/opt/whisper"
+        : process.env.WHISPER_ROOT;
+    const resolvedWhisperModel = process.env.WHISPER_MODEL ?? preparedRuntime.whisperModel;
+    const resolvedWhisperModelPath = isDevStage
+      ? preparedRuntime.whisperModelPath
+      : videoProcessorLayers.length > 0
+        ? `/opt/whisper/models/ggml-${resolvedWhisperModel}.bin`
+        : process.env.WHISPER_MODEL_PATH;
+    const resolvedWhisperCppVersion =
+      process.env.WHISPER_CPP_VERSION ?? preparedRuntime.whisperCppVersion;
+    const resolvedYtDlpPath = isDevStage
+      ? preparedRuntime.ytDlpPath
+      : videoProcessorLayers.length > 0
+        ? "/opt/bin/yt-dlp"
+        : process.env.YT_DLP_BIN;
+
     // ========================================
     // Video Processing Lambda (FFmpeg)
     // ========================================
-    // NOTE: This Lambda uses FFmpeg for video processing.
-    // For yt-dlp (YouTube download), you consider:
-    // 1. Using a Lambda Layer with yt-dlp binary
-    // 2. Container-based Lambda with yt-dlp installed
-    // 3. External service API for YouTube downloads
-    //
-    // For simplicity, this setup focuses on FFmpeg processing.
-    // YouTube downloads should be handled separately if needed.
     const videoProcessor = new sst.aws.Function("VideoProcessor", {
       handler: "infra/video-processor/handler.main",
       url: true, // Enable function URL for direct invocation
       timeout: "15 minutes", // Maximum Lambda timeout for video processing
       memory: "3008 MB", // Sufficient for video processing
       storage: "2048 MB", // Ephemeral storage for temporary files
+      ...(videoProcessorLayers.length > 0 ? { layers: videoProcessorLayers } : {}),
+      ...(managedVideoProcessorLayer
+        ? { architecture: preparedRuntime.layerArchitecture }
+        : {}),
       environment: {
-        BUCKET_NAME: videoBucket.name,
+        VIDEO_BUCKET_NAME: videoBucket.name,
+        VIDEO_BUCKET_REGION: "ap-northeast-1",
+        DATABASE_URL: databaseUrl,
+        TURSO_DATABASE_URL: tursoDatabaseUrl,
+        TURSO_AUTH_TOKEN: tursoAuthToken,
+        BETTER_AUTH_URL: betterAuthUrl,
+        BETTER_AUTH_SECRET: betterAuthSecret,
+        PROCESSING_WORKER_TOKEN: processingWorkerToken,
+        ...(resolvedProcessingRuntimeRoot
+          ? {
+              PROCESSING_RUNTIME_ROOT: resolvedProcessingRuntimeRoot,
+            }
+          : {}),
+        ...(resolvedWhisperRoot
+          ? {
+              WHISPER_ROOT: resolvedWhisperRoot,
+            }
+          : {}),
+        ...(resolvedWhisperModel
+          ? {
+              WHISPER_MODEL: resolvedWhisperModel,
+            }
+          : {}),
+        ...(resolvedWhisperModelPath
+          ? {
+              WHISPER_MODEL_PATH: resolvedWhisperModelPath,
+            }
+          : {}),
+        ...(resolvedWhisperCppVersion
+          ? {
+              WHISPER_CPP_VERSION: resolvedWhisperCppVersion,
+            }
+          : {}),
+        ...(resolvedYtDlpPath
+          ? {
+              YT_DLP_BIN: resolvedYtDlpPath,
+            }
+          : {}),
       },
       link: [videoBucket],
       // Note: FFmpeg Layer is required for video processing
@@ -94,9 +201,16 @@ export default $config({
         // Video bucket name accessible via Resource.VideoBucket.name
         // Video processor URL accessible via Resource.VideoProcessor.url
         VIDEO_BUCKET_NAME: videoBucket.name,
+        VIDEO_BUCKET_REGION: "ap-northeast-1",
+        DATABASE_URL: databaseUrl,
+        TURSO_DATABASE_URL: tursoDatabaseUrl,
+        TURSO_AUTH_TOKEN: tursoAuthToken,
+        BETTER_AUTH_URL: betterAuthUrl,
+        BETTER_AUTH_SECRET: betterAuthSecret,
+        PROCESSING_WORKER_TOKEN: processingWorkerToken,
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: stripePublishableKey.value,
-        STRIPE_PRO_PRICE_ID: stripeResources?.pro.monthlyPriceId ?? "",
-        STRIPE_BUSINESS_PRICE_ID: stripeResources?.business.monthlyPriceId ?? "",
+        STRIPE_PRO_PRICE_ID: stripeResources?.pro.monthlyPriceId,
+        STRIPE_BUSINESS_PRICE_ID: stripeResources?.business.monthlyPriceId,
       },
     });
 

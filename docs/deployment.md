@@ -11,56 +11,40 @@
 │  - API Routes                                        │
 │  - Server Actions                                    │
 ├─────────────────────────────────────────────────────┤
-│  VideoProcessor (Lambda)                            │
-│  - FFmpeg Layer                                      │
-│  - yt-dlp (bundled)                                   │
-│  - Max 15 min timeout                                │
+│  VideoProcessor (Lambda / SST live function)        │
+│  - FFmpeg + whisper-cpp worker                      │
+│  - Function URL async invoke                        │
+│  - Max 15 min timeout                               │
 ├─────────────────────────────────────────────────────┤
 │  S3 Bucket (VideoBucket)                            │
 │  - Source videos                                      │
 │  - Processed videos                                   │
 │  - Thumbnails                                         │
 ├─────────────────────────────────────────────────────┤
-│  Neon PostgreSQL (External)                         │
-│  - Prisma ORM                                         │
-│  - Better Auth                                        │
+│  Turso / libSQL                                     │
+│  - Prisma runtime adapter                           │
+│  - Better Auth                                      │
 └─────────────────────────────────────────────────────┘
 ```
 
-## 無料枠内訳 (AWS 12ヶ月 + Neon永続無料)
+## 無料構成
 
 | サービス | 無料枠 | 想定利用 |
 |---------|--------|-----------|
 | Lambda | 100万リクエスト/月 + 400,000 GB-秒 | 動画処理月数十本 |
 | S3 | 5GB | 動画約10-20本（処理後削除） |
 | CloudFront | 50GB転送/月 | 小〜中規模で十分 |
-| Neon | 0.5GB + 100時間 | 開発〜小規模で十分 |
+| Turso | Starter / Free | 開発〜小規模で十分 |
 
 ---
 
 ## セットアップ手順
 
-### 1. Neon PostgreSQL セットアップ
+### 1. Turso セットアップ
 
-1. [Neon Console](https://console.neon.tech/) でアカウント作成
-
-2. 新しいプロジェクトを作成:
-   - Project名: `sakuedit`
-   - Region: `US East (Ohio)` (AWSと同じリージョン)
-
-3. 接続文字列を取得:
-   ```
-   postgresql://[user]:[password]@[endpoint].neon.tech/[database]?sslmode=require
-   ```
-
-4. SSTにシークレットとして設定:
-   ```bash
-   # 開発環境
-   sst secrets set DatabaseUrlDev "postgresql://..."
-
-   # 本番環境
-   sst secrets set --stage production DatabaseUrl "postgresql://..."
-   ```
+1. Turso で `sakuedit` 用 DB を作成
+2. `libsql://...` URL と auth token を取得
+3. `.env` に設定
 
 ### 2. 環境変数の設定
 
@@ -69,9 +53,9 @@
 sst secrets set NextAuthSecretDev "your-secret-key-dev"
 sst secrets set --stage production NextAuthSecret "your-production-secret"
 
-# Deepgram API (ASR用)
-sst secrets set DeepgramApiKeyDev "dg_xxx..."
-sst secrets set --stage production DeepgramApiKey "dg_xxx..."
+# OpenRouter API
+sst secrets set OpenRouterApiKeyDev "sk-or-v1-xxx..."
+sst secrets set --stage production OpenRouterApiKey "sk-or-v1-xxx..."
 
 # Stripe Sandbox
 sst secret set StripePublishableKey "pk_test_xxx"
@@ -79,47 +63,80 @@ sst secret set StripeSecretKey "sk_test_xxx"
 sst secret set StripeWebhookSecret "whsec_xxx"
 ```
 
-### 3. Prisma スキーマの修正
+### 3. Prisma / Turso 設定
 
-PrismaスキーマのSQLiteをPostgreSQLに変更が必要:
+現在は Prisma schema の provider は `sqlite` のまま維持し、runtime では
+`@prisma/adapter-libsql` を使って Turso / libSQL に接続します。
 
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+`.env` には以下を設定します。
+
+```env
+TURSO_DATABASE_URL="libsql://your-database.turso.io"
+TURSO_AUTH_TOKEN="your_turso_auth_token"
+TURSO_DATABASE_NAME="your-database"
+```
+
+アプリ runtime はローカルでも本番でも Turso を使います。  
+`DATABASE_URL=file:...` は Prisma CLI の sqlite schema 検証用です。
+
+```env
+DATABASE_URL="file:./dev.db"
 ```
 
 ### 4. デプロイ実行
 
 ```bash
-# 開発環境にデプロイ
-npx sst deploy --stage dev
+# ローカル開発
+npx sst dev --stage dev
 
-# 本番環境にデプロイ
+# デプロイ
+npx sst deploy --stage dev
 npx sst deploy --stage production
 ```
 
-### 5. データベースマイグレーション
+### 5. データベース反映
 
 ```bash
-# マイグレーションファイルを生成
-npx prisma migrate deploy
+# Prisma Client 再生成
+npx prisma generate
 
-# 本番環境で実行
-npx prisma migrate deploy --schema=prisma/schema.prisma
+# Prisma Migrate はローカル SQLite に対して実行
+npx prisma migrate dev --name <migration-name>
+
+# 生成された migration.sql を Turso CLI で適用
+export MIGRATION_SQL_PATH="prisma/migrations/<timestamp>_<migration-name>/migration.sql"
+npm run db:migrate:apply
 ```
+
+`npm run db:migrate:apply` は公式手順の `turso db shell "$TURSO_DATABASE_NAME" < "$MIGRATION_SQL_PATH"` を薄く包んだものです。  
+`_prisma_migrations` を独自更新するカスタムスクリプトは使いません。
 
 ---
 
 ## ローカル開発
 
 ```bash
-# SST dev mode で開発
-npx sst dev
+brew install cmake ffmpeg
+```
 
-# または通常のNext.js dev server
-npm run dev
+`whisper-cpp` は `cmake` が無いと build できません。`sst dev` の worker でも同じ前提です。
+
+`VideoProcessor` は prebuilt runtime 前提です。`sst dev` ではローカル固定パス、`sst deploy` では Lambda Layer か container image で runtime を供給します。
+
+```env
+# 任意: layer や独自 runtime を使う場合
+PROCESSING_RUNTIME_ROOT=/opt
+WHISPER_ROOT=/opt/whisper
+WHISPER_MODEL=base
+WHISPER_MODEL_PATH=/opt/whisper/models/ggml-base.bin
+
+# 任意: deploy 時に Lambda Layer ARN を付与する場合
+VIDEO_PROCESSOR_LAYER_ARNS=arn:aws:lambda:ap-northeast-1:123456789012:layer:sakuedit-runtime:1
+```
+
+```bash
+# SST dev mode で開発
+npx sst dev --stage dev
 ```
 
 ### Stripe Sandbox をSSTで使う
@@ -158,6 +175,7 @@ stripe trigger customer.subscription.updated
 - Lambda のタイムアウトは最大15分
 - 長時間動画は処理が中断される可能性
 - 大きなファイルは S3 にアップロードしてから処理
+- `VideoProcessor` は起動時に `ffmpeg` `ffprobe` `Remotion CLI` `whisper` を self-check する
 
 ### ファイルサイズ制限
 
@@ -192,15 +210,15 @@ aws logs tail /aws/lambda/sakuedit-VideoProcessor
 
 ### データベース接続エラー
 
-- Neon コンソールで接続状態を確認
-- SSL mode=require が設定されているか
-- 接続文字列が正しいか
+- Turso の URL / auth token を確認
+- runtime は `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
+- Prisma CLI は `DATABASE_URL=file:...` も必要
 
 ---
 
 ## 本番環境への移行チェックリスト
 
-- [ ] Neon プロジェクト作成
+- [ ] Turso DB 作成
 - [ ] シークレット設定
 - [ ] `sst deploy --stage production`
 - [ ] データベースマイグレーション

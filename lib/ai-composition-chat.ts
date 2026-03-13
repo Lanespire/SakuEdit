@@ -256,7 +256,14 @@ function normalizePatches(rawPatches: RawPatch[], data: CompositionData): Compos
       case 'add_item': {
         const track = inferTrack(raw)
         if (!track || !raw.item) continue
-        const item = { ...raw.item, id: generateItemId() }
+        const item: Record<string, unknown> = { ...raw.item, id: generateItemId() }
+        // Resolve Japanese SFX aliases to canonical sfxType names
+        if (track === 'audioTracks' && item.category === 'sfx-builtin' && typeof item.sfxType === 'string') {
+          const resolved = SFX_ALIASES[item.sfxType] ?? item.sfxType
+          if (BUILTIN_SFX_TYPES.includes(resolved as typeof BUILTIN_SFX_TYPES[number])) {
+            item.sfxType = resolved
+          }
+        }
         patches.push({
           op: 'add_item',
           track,
@@ -276,11 +283,19 @@ function normalizePatches(rawPatches: RawPatch[], data: CompositionData): Compos
       case 'update_item': {
         const track = raw.track as TrackName | undefined
         if (!track || !raw.itemId || !raw.fields) continue
+        const fields = { ...raw.fields }
+        // Resolve Japanese SFX aliases in update_item fields
+        if (track === 'audioTracks' && typeof fields.sfxType === 'string') {
+          const resolved = SFX_ALIASES[fields.sfxType] ?? fields.sfxType
+          if (BUILTIN_SFX_TYPES.includes(resolved as typeof BUILTIN_SFX_TYPES[number])) {
+            fields.sfxType = resolved
+          }
+        }
         patches.push({
           op: 'update_item',
           track,
           itemId: raw.itemId,
-          fields: raw.fields,
+          fields,
         })
         break
       }

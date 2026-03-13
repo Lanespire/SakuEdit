@@ -7,7 +7,7 @@
 | Framework | Next.js | 16.x | App Router, RSC |
 | UI | React | 19.x | コンポーネント |
 | Styling | Tailwind CSS | 4.x | スタイリング |
-| Database | SQLite | 3.x | ローカルDB |
+| Database | Turso / libSQL | latest | アプリ runtime DB |
 | ORM | Prisma | Latest | DB操作 |
 | Auth | Better Auth | Latest | 認証 |
 | Video | Remotion | Latest | 動画生成・編集 |
@@ -139,7 +139,7 @@ Z.AIの `glm-5` はASRではなく以下の用途に使用:
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         SQLite + Prisma                               │
+│                      Turso/libSQL + Prisma                            │
 │  ┌─────────────────────────────────────────────────────────────────┐  │
 │  │  データベース                                                       │  │
 │  │  - User, Project, Video, Style, Subtitle, StyleAnalysis         │  │
@@ -279,7 +279,9 @@ sakuedit/
 
 ```env
 # Database
-DATABASE_URL="file:./dev.db"
+TURSO_DATABASE_URL="libsql://your-database.turso.io"
+TURSO_AUTH_TOKEN=""
+TURSO_DATABASE_NAME="your-database"
 
 # Auth
 BETTER_AUTH_SECRET=""
@@ -292,7 +294,7 @@ OPENAI_API_KEY=""
 ZAI_API_KEY=""
 
 # Storage
-UPLOAD_DIR="./uploads"
+DATABASE_URL="file:./dev.db"
 OUTPUT_DIR="./outputs"
 ```
 
@@ -326,19 +328,20 @@ OUTPUT_DIR="./outputs"
 ## データベース戦略
 
 ### 開発環境
-- **SQLite**: ローカル開発用、Prismaマイグレーションで管理
+- **Turso/libSQL**: Prisma schema は `sqlite` を維持しつつ、runtime は `@prisma/adapter-libsql` 経由で Turso を使う
 
 ### 本番環境（推奨）
-- **PostgreSQL**: Vercel Postgres / Supabase / PlanetScale
+- **Turso/libSQL または PostgreSQL**
 - **理由**: 複数ワーカー対応、再起動時のジョブ継続、保存保証
 
 ### 移行方法
 ```bash
-# スキーマはPrismaで抽象化されているため、provider変更のみ
-# datasource db {
-#   provider = "postgresql"  // sqlite → postgresql
-#   url      = env("DATABASE_URL")
-# }
+# 1. Prisma Migrate はローカル SQLite に対して実行
+npx prisma migrate dev --name <migration-name>
+
+# 2. 生成された SQL を Turso CLI で適用
+export MIGRATION_SQL_PATH="prisma/migrations/<timestamp>_<migration-name>/migration.sql"
+turso db shell "$TURSO_DATABASE_NAME" < "$MIGRATION_SQL_PATH"
 ```
 
 ---
@@ -346,7 +349,7 @@ OUTPUT_DIR="./outputs"
 ## ストレージ戦略
 
 ### 開発環境
-- **ローカルファイル**: `./uploads/` に保存
+- **S3**: `projects/{projectId}/...` の object key を source of truth にする
 
 ### 本番環境（推奨）
 - **オブジェクトストレージ**: Vercel Blob / Cloudflare R2 / AWS S3
@@ -355,13 +358,23 @@ OUTPUT_DIR="./outputs"
 ### ファイル構成
 ```
 uploads/
-├── videos/           # オリジナル動画
-│   └── {userId}/
-├── processed/        # 処理済み動画
-│   └── {projectId}/
-├── thumbnails/       # サムネイル
-├── exports/          # 書き出し結果
-└── temp/             # 一時ファイル（定期削除）
+└── projects/
+    └── {projectId}/
+        ├── input.mp4
+        └── artifacts/
+            └── {pipelineVersion}/
+                ├── output.mp4
+                ├── subtitles.srt
+                ├── thumbnail.jpg
+                └── source-audio.wav
+
+# S3 使用時
+projects/{projectId}/input.mp4
+projects/{projectId}/artifacts/{pipelineVersion}/output.mp4
+projects/{projectId}/artifacts/{pipelineVersion}/subtitles.srt
+projects/{projectId}/artifacts/{pipelineVersion}/thumbnail.jpg
+projects/{projectId}/artifacts/{pipelineVersion}/source-audio.wav
+projects/{projectId}/exports/{exportJobId}/...
 ```
 
 ---
@@ -369,7 +382,8 @@ uploads/
 ## ジョブキューシステム
 
 ### 開発環境
-- **インメモリキュー**: シンプルな実装
+- **SST Function URL + ProcessingJob**: start API は job を作成し、worker を async invoke する
+- **VideoProcessor runtime**: `sst dev` はローカル固定 runtime、deploy は Lambda Layer または container image を使う
 
 ### 本番環境（推奨）
 - **Vercel Queue / BullMQ (Redis)**: 永続的なジョブ管理

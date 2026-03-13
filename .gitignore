@@ -43,6 +43,7 @@ next-env.d.ts
 
 # Uploads
 /uploads/
+/tmp-*.mp4
 
 # Test results
 /test-results/

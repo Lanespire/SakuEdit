@@ -18,6 +18,7 @@ export interface PlanDefinition {
   hasWatermark: boolean
   hasSrtExport: boolean
   hasThumbnail: boolean
+  monthlyThumbnailCount: number
   hasPriorityQueue: boolean
   teamSeats: number
 }
@@ -48,6 +49,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasWatermark: true,
     hasSrtExport: false,
     hasThumbnail: false,
+    monthlyThumbnailCount: 0,
     hasPriorityQueue: false,
     teamSeats: 0,
   },
@@ -67,6 +69,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasWatermark: false,
     hasSrtExport: true,
     hasThumbnail: true,
+    monthlyThumbnailCount: 10,
     hasPriorityQueue: true,
     teamSeats: 0,
   },
@@ -86,6 +89,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasWatermark: false,
     hasSrtExport: true,
     hasThumbnail: true,
+    monthlyThumbnailCount: 50,
     hasPriorityQueue: true,
     teamSeats: 3,
   },
@@ -105,6 +109,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasWatermark: false,
     hasSrtExport: true,
     hasThumbnail: true,
+    monthlyThumbnailCount: 999,
     hasPriorityQueue: true,
     teamSeats: 0,
   },

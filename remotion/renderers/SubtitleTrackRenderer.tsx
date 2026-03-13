@@ -32,6 +32,58 @@ function TypewriterText({ text, progress }: { text: string; progress: number }) 
   return <>{text.slice(0, charCount)}</>
 }
 
+function getFadeOpacity(
+  frame: number,
+  startFrame: number,
+  endFrame: number,
+  fadeFrames: number,
+) {
+  const duration = endFrame - startFrame
+
+  if (duration <= 1) {
+    return 1
+  }
+
+  if (duration <= fadeFrames * 2) {
+    return interpolate(frame, [startFrame, startFrame + duration / 2, endFrame], [0, 1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    })
+  }
+
+  return interpolate(
+    frame,
+    [startFrame, startFrame + fadeFrames, endFrame - fadeFrames, endFrame],
+    [0, 1, 1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  )
+}
+
+function getExitOpacity(
+  frame: number,
+  startFrame: number,
+  endFrame: number,
+  fadeFrames: number,
+) {
+  const duration = endFrame - startFrame
+
+  if (duration <= 1) {
+    return 1
+  }
+
+  if (duration <= fadeFrames) {
+    return interpolate(frame, [startFrame, endFrame], [1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    })
+  }
+
+  return interpolate(frame, [endFrame - fadeFrames, endFrame], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  })
+}
+
 function WordHighlightText({
   text,
   progress,
@@ -100,12 +152,7 @@ function SubtitleItemRenderer({
 
   switch (item.animation) {
     case 'fade':
-      opacity = interpolate(
-        frame,
-        [startFrame, startFrame + 6, Math.max(startFrame + 6, endFrame - 6), endFrame],
-        [0, 1, 1, 0],
-        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-      )
+      opacity = getFadeOpacity(frame, startFrame, endFrame, 6)
       break
     case 'spring':
       scale = spring({
@@ -113,28 +160,13 @@ function SubtitleItemRenderer({
         fps,
         config: { damping: 16, stiffness: 180, mass: 0.7 },
       })
-      opacity = interpolate(
-        frame,
-        [Math.max(startFrame, endFrame - 6), endFrame],
-        [1, 0],
-        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-      )
+      opacity = getExitOpacity(frame, startFrame, endFrame, 6)
       break
     case 'typewriter':
-      opacity = interpolate(
-        frame,
-        [Math.max(startFrame, endFrame - 6), endFrame],
-        [1, 0],
-        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-      )
+      opacity = getExitOpacity(frame, startFrame, endFrame, 6)
       break
     case 'word-highlight':
-      opacity = interpolate(
-        frame,
-        [startFrame, startFrame + 4, Math.max(startFrame + 4, endFrame - 4), endFrame],
-        [0, 1, 1, 0],
-        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-      )
+      opacity = getFadeOpacity(frame, startFrame, endFrame, 4)
       break
     case 'none':
     default:

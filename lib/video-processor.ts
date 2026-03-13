@@ -1,8 +1,11 @@
 import { createServer } from 'http'
 import { type AddressInfo } from 'net'
+import { availableParallelism } from 'os'
 import { spawn } from 'child_process'
-import { createReadStream, promises as fs } from 'fs'
+import { createReadStream, existsSync, promises as fs } from 'fs'
 import * as path from 'path'
+import ffmpegBinary from 'ffmpeg-static'
+import ffprobe from 'ffprobe-static'
 import { getPlaybackSegments, type PlaybackSegment } from './editor'
 import {
   generateThumbnailWithMediabunny,
@@ -66,6 +69,7 @@ export interface VideoProcessOptions {
   quality?: '720p' | '1080p' | '4k'
   format?: 'mp4' | 'webm' | 'mov'
   watermark?: boolean
+  onRenderHeartbeat?: (elapsedSeconds: number) => Promise<void> | void
 }
 
 export interface SilenceDetection {
@@ -108,6 +112,117 @@ interface FFprobeFormat {
 interface FFprobeResponse {
   streams?: FFprobeStream[]
   format?: FFprobeFormat
+}
+
+function resolveExistingBinaryPath(candidates: Array<string | null | undefined>) {
+  return candidates
+    .filter((candidate): candidate is string => Boolean(candidate))
+    .find((candidate) => existsSync(candidate))
+}
+
+function resolveCommandFromPath(command: string) {
+  const pathEntries = (process.env.PATH || '')
+    .split(path.delimiter)
+    .filter(Boolean)
+
+  return resolveExistingBinaryPath(
+    pathEntries.map((entry) => path.join(entry, command)),
+  )
+}
+
+function getYtDlpPath() {
+  const processingRuntimeRoot = process.env.PROCESSING_RUNTIME_ROOT
+  const resolvedPath = resolveExistingBinaryPath([
+    process.env.YT_DLP_BIN,
+    processingRuntimeRoot ? path.join(processingRuntimeRoot, 'bin', 'yt-dlp') : null,
+    '/opt/bin/yt-dlp',
+    '/opt/homebrew/bin/yt-dlp',
+    '/usr/local/bin/yt-dlp',
+    resolveCommandFromPath('yt-dlp'),
+  ])
+
+  if (!resolvedPath) {
+    throw new Error(
+      'yt-dlp binary is not available. Set YT_DLP_BIN or include yt-dlp in the processing runtime.',
+    )
+  }
+
+  return resolvedPath
+}
+
+function getFfmpegPath() {
+  const processingRuntimeRoot = process.env.PROCESSING_RUNTIME_ROOT
+  const resolvedPath = resolveExistingBinaryPath([
+    process.env.FFMPEG_BIN,
+    processingRuntimeRoot ? path.join(processingRuntimeRoot, 'bin', 'ffmpeg') : null,
+    '/opt/bin/ffmpeg',
+    '/opt/ffmpeg/bin/ffmpeg',
+    '/opt/homebrew/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    resolveCommandFromPath('ffmpeg'),
+    ffmpegBinary,
+  ])
+
+  if (!resolvedPath) {
+    throw new Error(
+      'ffmpeg binary is not available. Set FFMPEG_BIN or mount a runtime layer under /opt.',
+    )
+  }
+
+  return resolvedPath
+}
+
+function getFfprobePath() {
+  const processingRuntimeRoot = process.env.PROCESSING_RUNTIME_ROOT
+  const resolvedPath = resolveExistingBinaryPath([
+    process.env.FFPROBE_BIN_PATH,
+    processingRuntimeRoot ? path.join(processingRuntimeRoot, 'bin', 'ffprobe') : null,
+    '/opt/bin/ffprobe',
+    '/opt/ffprobe/bin/ffprobe',
+    '/opt/homebrew/bin/ffprobe',
+    '/usr/local/bin/ffprobe',
+    resolveCommandFromPath('ffprobe'),
+    ffprobe.path,
+  ])
+
+  if (!resolvedPath) {
+    throw new Error(
+      'ffprobe binary is not available. Set FFPROBE_BIN_PATH or mount a runtime layer under /opt.',
+    )
+  }
+
+  return resolvedPath
+}
+
+function getRemotionPath() {
+  const processingRuntimeRoot = process.env.PROCESSING_RUNTIME_ROOT
+  const remotionPath = resolveExistingBinaryPath([
+    process.env.REMOTION_CLI_PATH,
+    processingRuntimeRoot ? path.join(processingRuntimeRoot, 'remotion', 'remotion-cli.js') : null,
+    '/opt/remotion/remotion-cli.js',
+    '/opt/nodejs/node_modules/@remotion/cli/remotion-cli.js',
+    path.join(process.cwd(), 'node_modules', '@remotion', 'cli', 'remotion-cli.js'),
+  ])
+
+  if (!remotionPath) {
+    throw new Error(
+      'Remotion CLI is not available. Set REMOTION_CLI_PATH or provide it in the processing runtime.',
+    )
+  }
+
+  return remotionPath
+}
+
+export function verifyVideoProcessingRuntime() {
+  return {
+    ffmpegPath: getFfmpegPath(),
+    ffprobePath: getFfprobePath(),
+    remotionCliPath: getRemotionPath(),
+  }
+}
+
+function getRemotionConcurrency() {
+  return Math.max(2, Math.min(6, Math.floor(availableParallelism() / 2)))
 }
 
 export interface SceneMetrics {
@@ -287,7 +402,7 @@ export async function detectSilence(
       '-'
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
     const silenceRegions: SilenceDetection[] = []
     let lastStart: number | null = null
 
@@ -342,7 +457,7 @@ export async function getVideoDuration(inputPath: string): Promise<number> {
       '-of', 'csv=p=0'
     ]
 
-    const ffprobe = spawn('ffprobe', args)
+    const ffprobe = spawn(getFfprobePath(), args)
 
     let output = ''
     ffprobe.stdout.on('data', (data) => {
@@ -384,7 +499,7 @@ export async function downloadFromYouTube(
       youtubeUrl
     ]
 
-    const ytDlp = spawn('yt-dlp', args)
+    const ytDlp = spawn(getYtDlpPath(), args)
 
     let stderrOutput = ''
 
@@ -451,7 +566,7 @@ export async function extractAudio(
       outputPath
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
 
     let stderrOutput = ''
 
@@ -498,7 +613,7 @@ export async function getVideoMetadata(inputPath: string): Promise<VideoMetadata
       inputPath
     ]
 
-    const ffprobe = spawn('ffprobe', args)
+    const ffprobe = spawn(getFfprobePath(), args)
 
     let output = ''
 
@@ -608,7 +723,7 @@ async function extractFrameSnapshot(
       outputPath,
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
     let stderrOutput = ''
 
     ffmpeg.stderr.on('data', (data) => {
@@ -650,7 +765,7 @@ export async function detectSceneChanges(
       '-',
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
     const timestamps: number[] = []
     let stderrOutput = ''
 
@@ -789,7 +904,7 @@ export async function cutSilence(
       outputPath
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
 
     let stderrOutput = ''
 
@@ -877,7 +992,7 @@ export async function generateThumbnail(
       outputPath
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
 
     let stderrOutput = ''
 
@@ -921,6 +1036,7 @@ export async function processVideo(
     subtitles = [],
     quality = '1080p',
     // format and watermark are reserved for future use
+    onRenderHeartbeat,
   } = options
 
   try {
@@ -955,6 +1071,9 @@ export async function processVideo(
         },
       },
       outputPath,
+      {
+        onHeartbeat: onRenderHeartbeat,
+      },
     )
 
     if (!renderResult.success) {
@@ -982,7 +1101,10 @@ export async function processVideo(
 export async function renderWithRemotion(
   compositionId: string,
   inputProps: Record<string, unknown>,
-  outputPath: string
+  outputPath: string,
+  options?: {
+    onHeartbeat?: (elapsedSeconds: number) => Promise<void> | void
+  },
 ): Promise<ProcessingResult> {
   try {
     const candidateVideoUrl =
@@ -990,27 +1112,38 @@ export async function renderWithRemotion(
 
     const executeRender = async (resolvedInputProps: Record<string, unknown>) => {
       return new Promise<ProcessingResult>((resolve) => {
+        const startedAt = Date.now()
         const args = [
-          'remotion',
           'render',
           'remotion/index.ts',
           compositionId,
           outputPath,
+          '--concurrency',
+          String(getRemotionConcurrency()),
           '--props',
           JSON.stringify(resolvedInputProps),
         ]
 
-        const remotion = spawn('npx', args, {
+        const remotion = spawn(process.execPath, [getRemotionPath(), ...args], {
           cwd: process.cwd(),
         })
 
+        let stdoutOutput = ''
         let stderrOutput = ''
+        const heartbeatInterval = setInterval(() => {
+          void options?.onHeartbeat?.(Math.floor((Date.now() - startedAt) / 1000))
+        }, 15000)
+
+        remotion.stdout.on('data', (data) => {
+          stdoutOutput += data.toString()
+        })
 
         remotion.stderr.on('data', (data) => {
           stderrOutput += data.toString()
         })
 
         remotion.on('close', (code) => {
+          clearInterval(heartbeatInterval)
           if (code === 0) {
             resolve({ success: true, outputPath })
             return
@@ -1018,11 +1151,15 @@ export async function renderWithRemotion(
 
           resolve({
             success: false,
-            error: stderrOutput.trim() || `Remotion exited with code ${code}`,
+            error:
+              stderrOutput.trim() ||
+              stdoutOutput.trim() ||
+              `Remotion exited with code ${code}`,
           })
         })
 
         remotion.on('error', (err) => {
+          clearInterval(heartbeatInterval)
           resolve({ success: false, error: err.message })
         })
       })
@@ -1104,7 +1241,7 @@ export async function exportVideo(
       outputPath
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
 
     let stderrOutput = ''
 
@@ -1178,7 +1315,7 @@ export async function generateWaveformData(
       '-'
     ]
 
-    const ffmpeg = spawn('ffmpeg', args)
+    const ffmpeg = spawn(getFfmpegPath(), args)
     let stdout = ''
     ffmpeg.stdout.on('data', (data) => {
       stdout += data.toString()

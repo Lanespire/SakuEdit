@@ -147,8 +147,8 @@ export default function AudioBrowser({
         category: 'voiceover',
         name: `ナレーション: ${voText.slice(0, 20)}...`,
       })
-    } catch {
-      // Error handling - silently fail for now
+    } catch (voError) {
+      console.error('voiceover generation error:', voError)
     } finally {
       setVoLoading(false)
     }
@@ -157,13 +157,24 @@ export default function AudioBrowser({
   // Load voices for voiceover tab
   useEffect(() => {
     if (activeTab === 'voiceover' && voices.length === 0) {
-      fetch('/api/audio/generate-voiceover')
-        .catch(() => {})
-      // Voices would be loaded from a dedicated endpoint in production
-      // For now, provide a default set
-      setVoices([
-        { voiceId: 'default', name: 'デフォルト' },
-      ])
+      fetch('/api/audio/voices')
+        .then((res) => {
+          if (!res.ok) throw new Error('Failed to fetch voices')
+          return res.json()
+        })
+        .then((data) => {
+          if (data.voices && Array.isArray(data.voices) && data.voices.length > 0) {
+            setVoices(data.voices.map((v: { voice_id?: string; voiceId?: string; name: string }) => ({
+              voiceId: v.voice_id ?? v.voiceId ?? 'default',
+              name: v.name,
+            })))
+          } else {
+            setVoices([{ voiceId: 'default', name: 'デフォルト' }])
+          }
+        })
+        .catch(() => {
+          setVoices([{ voiceId: 'default', name: 'デフォルト' }])
+        })
     }
   }, [activeTab, voices.length])
 

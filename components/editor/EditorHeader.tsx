@@ -13,6 +13,7 @@ interface EditorHeaderProps {
   onRedo: () => void
   onSaveDraft: () => void
   onOpenExport: () => void
+  onOpenThumbnailModal?: () => void
   onGoToProjects: () => void
   onStartEditingName: () => void
   onNameValueChange: (value: string) => void
@@ -61,6 +62,7 @@ export default function EditorHeader({
   onRedo,
   onSaveDraft,
   onOpenExport,
+  onOpenThumbnailModal,
   onGoToProjects,
   onStartEditingName,
   onNameValueChange,
@@ -116,6 +118,18 @@ export default function EditorHeader({
           <span className="material-symbols-outlined text-[14px]">{isSaving ? 'sync' : 'cloud_done'}</span>
           <span>{lastSavedText}</span>
         </div>
+
+        {onOpenThumbnailModal && (
+          <button
+            type="button"
+            onClick={onOpenThumbnailModal}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            data-test-id="thumbnail-generate-button"
+          >
+            <span className="material-symbols-outlined text-[16px]">image</span>
+            <span className="hidden sm:inline">サムネ生成</span>
+          </button>
+        )}
 
         <button
           type="button"

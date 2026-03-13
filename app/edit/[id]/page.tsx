@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import EditorHeader from '@/components/editor/EditorHeader'
-import EditorTimeline from '@/components/editor/EditorTimeline'
 import MultiTrackTimeline from '@/components/editor/MultiTrackTimeline'
-import PropertyPanel from '@/components/editor/PropertyPanel'
-import AddItemPanel from '@/components/editor/AddItemPanel'
-import IntegratedEditorPanel from '@/components/editor/IntegratedEditorPanel'
+import EditorSidebar from '@/components/editor/EditorSidebar'
+import RightInspector from '@/components/editor/RightInspector'
+import ProcessingWorkspace from '@/components/editor/ProcessingWorkspace'
 import VideoPlayer from '@/components/editor/VideoPlayer'
 import { ExportSettingsModal, SubtitleEditModal, type ExportSettings, type Subtitle } from '@/components/modals'
 import {
@@ -35,13 +34,21 @@ import { useEditorActions } from '@/lib/hooks/useEditorActions'
 import { type AIChatMessage, useEditorUiStore } from '@/lib/stores/editor-ui-store'
 import { useCompositionStore } from '@/lib/stores/composition-store'
 import type { TrackName } from '@/lib/composition-data'
+import { isProjectErrorStatus, isProjectProcessingStatus } from '@/lib/project-status'
 import type { PlanId } from '@/lib/plans'
+import ThumbnailGeneratorModal from '@/components/thumbnail/ThumbnailGeneratorModal'
+import ExportCompleteSheet from '@/components/editor/ExportCompleteSheet'
+import { useThumbnailStore } from '@/lib/stores/thumbnail-store'
+import { getPlanDefinition } from '@/lib/plans'
 
 interface ProjectResponse {
   project: {
     id: string
     name: string
     status: string
+    progress?: number | null
+    progressMessage?: string | null
+    lastError?: string | null
     timeline?: {
       currentTime?: number
       zoomLevel?: number
@@ -104,6 +111,12 @@ interface BillingData {
   usedSeconds: number
 }
 
+interface ProcessingLogEntry {
+  id: string
+  timestamp: string
+  text: string
+}
+
 function createInitialMessages(): AIChatMessage[] {
   return []
 }
@@ -116,6 +129,8 @@ export default function EditPage() {
   const hasHydratedRef = useRef(false)
   const timelineSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const compositionStore = useCompositionStore()
+  const compositionStoreRef = useRef(compositionStore)
+  const thumbnailStore = useThumbnailStore()
 
   const {
     isSubtitleModalOpen,
@@ -166,9 +181,9 @@ export default function EditPage() {
     selectedItemTrack,
     setSelectedItem,
   } = useEditorUiStore()
+  const hydrateProjectRef = useRef(hydrateProject)
 
   const [billingData, setBillingData] = useState<BillingData | null>(null)
-  const [isAddItemPanelOpen, setIsAddItemPanelOpen] = useState(false)
   const [projectStyle, setProjectStyle] = useState<ProjectResponse['project']['style']>(null)
   const [subtitleDisplaySettings, setSubtitleDisplaySettings] = useState<SubtitleDisplaySettings>(
     DEFAULT_SUBTITLE_DISPLAY_SETTINGS,
@@ -176,12 +191,27 @@ export default function EditPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const [exportCompleteUrl, setExportCompleteUrl] = useState<string | null>(null)
   const [editNameValue, setEditNameValue] = useState('')
+  const [projectStatus, setProjectStatus] = useState('DRAFT')
+  const [projectProgress, setProjectProgress] = useState(0)
+  const [projectProgressMessage, setProjectProgressMessage] = useState('')
+  const [projectLastError, setProjectLastError] = useState<string | null>(null)
+  const [processingLogs, setProcessingLogs] = useState<ProcessingLogEntry[]>([])
 
   const { saveDraft, updateProjectName, goToProjects } = useEditorActions({
     projectId,
     projectName: projectName || 'プロジェクト',
   })
+
+  const isProjectProcessing = isProjectProcessingStatus(projectStatus)
+  const isProjectPipelineError = isProjectErrorStatus(projectStatus)
+  const hasProjectProcessingFailure =
+    Boolean(projectLastError) &&
+    projectStatus !== 'COMPLETED' &&
+    !isProjectProcessing &&
+    projectProgress > 0
+  const processingWorkspaceStatus = hasProjectProcessingFailure ? 'ERROR' : projectStatus
 
   const primaryVideo = video
   const playbackSegments = useMemo(
@@ -190,128 +220,187 @@ export default function EditPage() {
   )
 
   useEffect(() => {
+    compositionStoreRef.current = compositionStore
+  }, [compositionStore])
+
+  useEffect(() => {
+    hydrateProjectRef.current = hydrateProject
+  }, [hydrateProject])
+
+  const loadProject = useCallback(async (options: { background?: boolean } = {}) => {
+    const { background = false } = options
+
+    if (!background) {
+      setIsLoading(true)
+      setError('')
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`)
+      if (!response.ok) {
+        throw new Error('プロジェクトの読み込みに失敗しました')
+      }
+
+      const data = (await response.json()) as ProjectResponse
+      const project = data.project
+      const sourceVideo = project.videos[0]
+      const normalizedSubtitles = project.subtitles.map((subtitle) => toEditorSubtitle(subtitle))
+      const normalizedMarkers: EditorMarker[] = (project.markers ?? []).map((marker) => ({
+        id: marker.id,
+        time: marker.time,
+        type: marker.type,
+        label: marker.label ?? null,
+        color: marker.color ?? '#f97415',
+      }))
+      const normalizedSilenceRegions = sourceVideo ? normalizeSilenceRegions(sourceVideo.silenceDetected) : []
+      const normalizedWaveform = sourceVideo ? normalizeWaveform(sourceVideo.waveform) : []
+      const normalizedHighlights = sourceVideo ? normalizeHighlights(sourceVideo.highlights) : []
+      const estimatedDuration = getEditorMediaDurationSeconds(
+        sourceVideo?.duration ?? 0,
+        normalizedSubtitles,
+        normalizedMarkers,
+        normalizedHighlights,
+        normalizedSilenceRegions,
+      )
+      const editorVideo: EditorVideoAsset | null = sourceVideo
+        ? {
+            id: sourceVideo.id,
+            filename: sourceVideo.filename,
+            storagePath: sourceVideo.storagePath,
+            previewUrl: `/api/projects/${projectId}/source-video`,
+            duration: estimatedDuration,
+            silenceRegions: normalizedSilenceRegions,
+            waveform: normalizedWaveform,
+            highlights: normalizedHighlights,
+          }
+        : null
+
+      const normalizedSuggestions = project.aiSuggestions.length > 0
+        ? project.aiSuggestions.map((suggestion) =>
+            withSuggestionVisuals({
+              id: suggestion.id,
+              type: suggestion.type,
+              title: suggestion.title,
+              description: suggestion.description,
+              data: suggestion.data,
+              isApplied: suggestion.isApplied,
+            }),
+          )
+        : buildFallbackSuggestions(editorVideo)
+
+      const isSilenceSuggestionApplied = normalizedSuggestions.some(
+        (suggestion) => suggestion.type === 'silence-cut' && suggestion.isApplied,
+      )
+      const nextDurationSeconds = getTimelineDurationSeconds(
+        estimatedDuration,
+        editorVideo?.silenceRegions ?? [],
+        isSilenceSuggestionApplied,
+      )
+
+      hydrateProjectRef.current({
+        projectName: project.name,
+        video: editorVideo,
+        subtitles: normalizedSubtitles,
+        aiSuggestions: normalizedSuggestions,
+        markers: normalizedMarkers,
+        durationSeconds: nextDurationSeconds,
+        playheadSeconds: Math.min(project.timeline?.currentTime ?? 0, nextDurationSeconds),
+        zoomLevel: project.timeline?.zoomLevel ?? 1,
+        scrollPosition: project.timeline?.scrollPosition ?? 0,
+        cutApplied: isSilenceSuggestionApplied,
+        chatMessages: createInitialMessages(),
+      })
+
+      if (project.compositionData) {
+        compositionStoreRef.current.hydrateFromServer(project.compositionData)
+      } else {
+        compositionStoreRef.current.hydrateFromLegacy({
+          video: editorVideo
+            ? {
+                id: editorVideo.id,
+                previewUrl: editorVideo.previewUrl,
+                storagePath: editorVideo.storagePath,
+                duration: editorVideo.duration,
+                silenceRegions: editorVideo.silenceRegions,
+              }
+            : null,
+          subtitles: normalizedSubtitles,
+          cutApplied: isSilenceSuggestionApplied,
+          durationSeconds: nextDurationSeconds,
+        })
+      }
+
+      setProjectStatus(project.status)
+      setProjectProgress(Math.max(0, Math.min(project.progress ?? 0, 100)))
+      setProjectProgressMessage(project.progressMessage ?? '')
+      setProjectLastError(project.lastError ?? null)
+      setProjectStyle(project.style ?? null)
+      setSubtitleDisplaySettings(
+        getSubtitleDisplaySettings(
+          project.style?.subtitleSettings ?? DEFAULT_SUBTITLE_DISPLAY_SETTINGS,
+        ),
+      )
+      setBillingData(data.billing ?? null)
+      setLastSavedAt(new Date())
+      hasHydratedRef.current = true
+    } catch (loadError) {
+      console.error(loadError)
+      setError(loadError instanceof Error ? loadError.message : 'エラーが発生しました')
+    } finally {
+      if (!background) {
+        setIsLoading(false)
+      }
+    }
+  }, [projectId])
+
+  useEffect(() => {
     if (!projectId) {
       return
     }
 
-    const loadProject = async () => {
-      setIsLoading(true)
-      setError('')
+    void loadProject()
+  }, [loadProject, projectId])
 
-      try {
-        const response = await fetch(`/api/projects/${projectId}`)
-        if (!response.ok) {
-          throw new Error('プロジェクトの読み込みに失敗しました')
-        }
-
-        const data = (await response.json()) as ProjectResponse
-        const project = data.project
-        const sourceVideo = project.videos[0]
-        const normalizedSubtitles = project.subtitles.map((subtitle) => toEditorSubtitle(subtitle))
-        const normalizedMarkers: EditorMarker[] = (project.markers ?? []).map((marker) => ({
-          id: marker.id,
-          time: marker.time,
-          type: marker.type,
-          label: marker.label ?? null,
-          color: marker.color ?? '#f97415',
-        }))
-        const normalizedSilenceRegions = sourceVideo ? normalizeSilenceRegions(sourceVideo.silenceDetected) : []
-        const normalizedWaveform = sourceVideo ? normalizeWaveform(sourceVideo.waveform) : []
-        const normalizedHighlights = sourceVideo ? normalizeHighlights(sourceVideo.highlights) : []
-        const estimatedDuration = getEditorMediaDurationSeconds(
-          sourceVideo?.duration ?? 0,
-          normalizedSubtitles,
-          normalizedMarkers,
-          normalizedHighlights,
-          normalizedSilenceRegions,
-        )
-        const editorVideo: EditorVideoAsset | null = sourceVideo
-          ? {
-              id: sourceVideo.id,
-              filename: sourceVideo.filename,
-              storagePath: sourceVideo.storagePath,
-              previewUrl: `/api/projects/${projectId}/source-video`,
-              duration: estimatedDuration,
-              silenceRegions: normalizedSilenceRegions,
-              waveform: normalizedWaveform,
-              highlights: normalizedHighlights,
-            }
-          : null
-
-        const normalizedSuggestions = project.aiSuggestions.length > 0
-          ? project.aiSuggestions.map((suggestion) =>
-              withSuggestionVisuals({
-                id: suggestion.id,
-                type: suggestion.type,
-                title: suggestion.title,
-                description: suggestion.description,
-                data: suggestion.data,
-                isApplied: suggestion.isApplied,
-              }),
-            )
-          : buildFallbackSuggestions(editorVideo)
-
-        const isSilenceSuggestionApplied = normalizedSuggestions.some(
-          (suggestion) => suggestion.type === 'silence-cut' && suggestion.isApplied,
-        )
-        const nextDurationSeconds = getTimelineDurationSeconds(
-          estimatedDuration,
-          editorVideo?.silenceRegions ?? [],
-          isSilenceSuggestionApplied,
-        )
-
-        hydrateProject({
-          projectName: project.name,
-          video: editorVideo,
-          subtitles: normalizedSubtitles,
-          aiSuggestions: normalizedSuggestions,
-          markers: normalizedMarkers,
-          durationSeconds: nextDurationSeconds,
-          playheadSeconds: Math.min(project.timeline?.currentTime ?? 0, nextDurationSeconds),
-          zoomLevel: project.timeline?.zoomLevel ?? 1,
-          scrollPosition: project.timeline?.scrollPosition ?? 0,
-          cutApplied: isSilenceSuggestionApplied,
-          chatMessages: createInitialMessages(),
-        })
-
-        if (project.compositionData) {
-          compositionStore.hydrateFromServer(project.compositionData)
-        } else {
-          compositionStore.hydrateFromLegacy({
-            video: editorVideo
-              ? {
-                  id: editorVideo.id,
-                  previewUrl: editorVideo.previewUrl,
-                  storagePath: editorVideo.storagePath,
-                  duration: editorVideo.duration,
-                  silenceRegions: editorVideo.silenceRegions,
-                }
-              : null,
-            subtitles: normalizedSubtitles,
-            cutApplied: isSilenceSuggestionApplied,
-            durationSeconds: nextDurationSeconds,
-          })
-        }
-
-        setProjectStyle(project.style ?? null)
-        setSubtitleDisplaySettings(
-          getSubtitleDisplaySettings(
-            project.style?.subtitleSettings ?? DEFAULT_SUBTITLE_DISPLAY_SETTINGS,
-          ),
-        )
-        setBillingData(data.billing ?? null)
-        hasHydratedRef.current = true
-      } catch (loadError) {
-        console.error(loadError)
-        setError(loadError instanceof Error ? loadError.message : 'エラーが発生しました')
-      } finally {
-        setIsLoading(false)
-      }
+  useEffect(() => {
+    if (!projectId || !isProjectProcessing) {
+      return
     }
 
-    void loadProject()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrateProject, projectId])
+    const intervalId = window.setInterval(() => {
+      void loadProject({ background: true })
+    }, 2000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [isProjectProcessing, loadProject, projectId])
+
+  useEffect(() => {
+    const message = projectLastError || projectProgressMessage
+    if (!message) {
+      return
+    }
+
+    setProcessingLogs((prev) => {
+      const lastLog = prev[prev.length - 1]
+      if (lastLog?.text === message) {
+        return prev
+      }
+
+      return [
+        ...prev.slice(-5),
+        {
+          id: `${Date.now()}-${projectProgress}`,
+          timestamp: new Date().toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+          text: message,
+        },
+      ]
+    })
+  }, [projectLastError, projectProgress, projectProgressMessage])
 
   useEffect(() => {
     if (!projectId || !hasHydratedRef.current || isLoading) {
@@ -629,6 +718,55 @@ export default function EditPage() {
     }
   }
 
+  const handleSendCompositionChat = async (message: string) => {
+    const createdAt = new Date().toISOString()
+    appendChatMessage({
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: message,
+      createdAt,
+    })
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          compositionData: compositionStore.compositionData,
+          chatHistory: chatMessages
+            .slice(-10)
+            .map((msg) => ({ role: msg.role, content: msg.content })),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('AIチャットのリクエストに失敗しました')
+      }
+
+      const result = await response.json()
+
+      appendChatMessage({
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: result.message,
+        createdAt: new Date().toISOString(),
+      })
+
+      if (result.patches && result.patches.length > 0) {
+        compositionStore.applyPatches(result.patches)
+      }
+    } catch (chatError) {
+      console.error('composition chat error:', chatError)
+      appendChatMessage({
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: 'すみません、エラーが発生しました。もう一度お試しください。',
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+
   const handleSendPrompt = (prompt: string) => {
     const createdAt = new Date().toISOString()
     appendChatMessage({
@@ -812,7 +950,7 @@ export default function EditPage() {
 
       const data = await res.json()
       if (data.downloadUrl) {
-        window.location.href = data.downloadUrl
+        setExportCompleteUrl(data.downloadUrl)
       }
 
       if (data.billing) {
@@ -872,6 +1010,30 @@ export default function EditPage() {
     )
   }
 
+  if (isProjectProcessing || isProjectPipelineError || hasProjectProcessingFailure) {
+    return (
+      <ProcessingWorkspace
+        projectName={projectName || 'プロジェクト'}
+        status={processingWorkspaceStatus}
+        progress={projectProgress}
+        progressMessage={projectProgressMessage}
+        lastError={projectLastError}
+        video={primaryVideo ? {
+          id: primaryVideo.id,
+          storagePath: primaryVideo.storagePath,
+          previewUrl: primaryVideo.previewUrl,
+          filename: primaryVideo.filename,
+          duration: primaryVideo.duration,
+        } : null}
+        logs={processingLogs}
+        onReload={() => {
+          void loadProject()
+        }}
+        onBackToProjects={goToProjects}
+      />
+    )
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#2a1d17] font-display text-white selection:bg-primary/30">
       <EditorHeader
@@ -887,6 +1049,7 @@ export default function EditPage() {
         onRedo={redo}
         onSaveDraft={saveDraft}
         onOpenExport={openExportModal}
+        onOpenThumbnailModal={() => thumbnailStore.openModal()}
         onGoToProjects={goToProjects}
         onStartEditingName={startEditingName}
         onNameValueChange={setEditNameValue}
@@ -894,12 +1057,21 @@ export default function EditPage() {
         onCancelEditingName={() => setEditingName(false)}
       />
 
-      <main className="flex-1 overflow-hidden bg-[#1a1411]">
-        <Group orientation="vertical">
-          <Panel defaultSize={40} minSize={26}>
-            <div className="h-full overflow-auto bg-[#1a1411] px-2 pb-2 pt-2">
-              <div className="flex h-full min-h-[320px] flex-col gap-2 xl:flex-row">
-                <section className="flex min-h-[280px] flex-1 items-center justify-center rounded-[24px] border border-[#3f2d24] bg-[radial-gradient(circle_at_top,_rgba(249,116,21,0.08),_transparent_28%),linear-gradient(180deg,#26201d_0%,#171210_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] xl:p-4">
+      <main className="flex flex-1 overflow-hidden bg-[#1a1411]">
+        {/* 左サイドバー: EditorSidebar */}
+        <div className="shrink-0 border-r border-[#3a291f] bg-[#15100d]">
+          <EditorSidebar
+            onAddItem={handleAddItem}
+            playheadSeconds={playheadSeconds}
+          />
+        </div>
+
+        {/* 中央: Preview + Timeline 縦分割 */}
+        <div className="flex-1 overflow-hidden">
+          <Group orientation="vertical">
+            <Panel defaultSize={40} minSize={26}>
+              <div className="h-full overflow-auto bg-[#1a1411] px-2 pb-2 pt-2">
+                <section className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-[#3f2d24] bg-[radial-gradient(circle_at_top,_rgba(249,116,21,0.08),_transparent_28%),linear-gradient(180deg,#26201d_0%,#171210_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] xl:p-4">
                   <VideoPlayer
                     video={primaryVideo ? {
                       id: primaryVideo.id,
@@ -921,111 +1093,88 @@ export default function EditPage() {
                     onPlaybackRateChange={setPlaybackRate}
                   />
                 </section>
-
-                <div className="min-h-[280px] xl:w-[300px] xl:min-w-[300px]">
-                  <IntegratedEditorPanel
-                    subtitles={subtitles}
-                    markers={markers}
-                    suggestions={aiSuggestions}
-                    messages={chatMessages}
-                    selectedSubtitleId={selectedSubtitleId}
-                    playheadSeconds={playheadSeconds}
-                    zoomLevel={zoomLevel}
-                    cutApplied={cutApplied}
-                    styleName={projectStyle?.name ?? undefined}
-                    subtitleDisplayMode={subtitleDisplaySettings.mode}
-                    subtitleIntervalSeconds={subtitleDisplaySettings.intervalSeconds}
-                    playbackRate={playbackRate}
-                    onSendPrompt={handleSendPrompt}
-                    onApplySuggestion={(id) => {
-                      void handleApplySuggestion(id)
-                    }}
-                    onPreviewSuggestion={handlePreviewSuggestion}
-                    onZoomChange={setZoomLevel}
-                    onSelectSubtitle={(index) => {
-                      selectSubtitleById(subtitles[index]?.id ?? null)
-                    }}
-                    onEditSubtitle={(index) => {
-                      selectSubtitleById(subtitles[index]?.id ?? null)
-                      openSubtitleModal(index)
-                    }}
-                    onJumpToMarker={handleJumpToMarker}
-                    onResetPlaybackRate={() => setPlaybackRate(1)}
-                    onAddSubtitle={handleAddSubtitle}
-                    onOpenStyle={() => router.push(`/styles?projectId=${projectId}`)}
-                    onSubtitleDisplayModeChange={(mode) =>
-                      setSubtitleDisplaySettings((current) => ({ ...current, mode }))
-                    }
-                    onSubtitleIntervalSecondsChange={(seconds) =>
-                      setSubtitleDisplaySettings((current) => ({ ...current, intervalSeconds: seconds }))
-                    }
-                  />
-                </div>
               </div>
-            </div>
-          </Panel>
+            </Panel>
 
-          <Separator className="flex h-1 cursor-row-resize items-center justify-center bg-[#3a291f] transition-colors hover:bg-primary/55">
-            <div className="h-0.5 w-8 rounded-full bg-white/30 transition-colors group-hover:bg-white/60" />
-          </Separator>
+            <Separator className="flex h-1 cursor-row-resize items-center justify-center bg-[#3a291f] transition-colors hover:bg-primary/55">
+              <div className="h-0.5 w-8 rounded-full bg-white/30 transition-colors group-hover:bg-white/60" />
+            </Separator>
 
-          <Panel defaultSize={60} minSize={42}>
-            <div className="flex h-full overflow-hidden bg-[#14100e] px-2 pb-2 pt-2">
-              {/* Multi-track timeline */}
-              <div className="flex-1 overflow-hidden rounded-l-[24px] border border-r-0 border-[#3a291f] shadow-[0_18px_42px_rgba(0,0,0,0.2)]">
-                <div className="flex h-full flex-col">
-                  {/* Timeline toolbar */}
-                  <div className="flex items-center justify-between border-b border-white/10 bg-[#211b18] px-3 py-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Multi-Track</span>
-                    <button
-                      type="button"
-                      className="rounded px-2 py-1 text-[11px] font-medium text-white/60 hover:bg-white/10 hover:text-white"
-                      onClick={() => setIsAddItemPanelOpen(!isAddItemPanelOpen)}
-                    >
-                      + 追加
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <MultiTrackTimeline
-                      compositionData={compositionStore.compositionData}
-                      durationSeconds={durationSeconds}
-                      playheadSeconds={playheadSeconds}
-                      zoomLevel={zoomLevel}
-                      scrollPosition={scrollPosition}
-                      selectedItemId={selectedItemId}
-                      selectedItemTrack={selectedItemTrack}
-                      onPlayheadChange={setPlayheadSeconds}
-                      onZoomChange={setZoomLevel}
-                      onScrollPositionChange={setScrollPosition}
-                      onSelectItem={handleSelectItem}
-                      onMoveItem={handleMoveItem}
-                      onResizeItem={handleResizeItem}
-                    />
+            <Panel defaultSize={60} minSize={42}>
+              <div className="h-full overflow-hidden bg-[#14100e] px-2 pb-2 pt-2">
+                <div className="h-full overflow-hidden rounded-[24px] border border-[#3a291f] shadow-[0_18px_42px_rgba(0,0,0,0.2)]">
+                  <div className="flex h-full flex-col">
+                    <div className="flex items-center justify-between border-b border-white/10 bg-[#211b18] px-3 py-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Multi-Track</span>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <MultiTrackTimeline
+                        compositionData={compositionStore.compositionData}
+                        durationSeconds={durationSeconds}
+                        playheadSeconds={playheadSeconds}
+                        zoomLevel={zoomLevel}
+                        scrollPosition={scrollPosition}
+                        selectedItemId={selectedItemId}
+                        selectedItemTrack={selectedItemTrack}
+                        onPlayheadChange={setPlayheadSeconds}
+                        onZoomChange={setZoomLevel}
+                        onScrollPositionChange={setScrollPosition}
+                        onSelectItem={handleSelectItem}
+                        onMoveItem={handleMoveItem}
+                        onResizeItem={handleResizeItem}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
+            </Panel>
+          </Group>
+        </div>
 
-              {/* Property panel */}
-              <div className="w-[240px] min-w-[240px] overflow-hidden rounded-r-[24px] border border-[#3a291f] shadow-[0_18px_42px_rgba(0,0,0,0.2)]">
-                <PropertyPanel
-                  selectedItem={selectedItemData}
-                  selectedTrack={selectedItemTrack}
-                  onUpdateItem={handleUpdateItem}
-                />
-              </div>
-
-              {/* Add item side panel */}
-              {isAddItemPanelOpen && (
-                <AddItemPanel
-                  isOpen={isAddItemPanelOpen}
-                  onClose={() => setIsAddItemPanelOpen(false)}
-                  onAddItem={handleAddItem}
-                  playheadSeconds={playheadSeconds}
-                />
-              )}
-            </div>
-          </Panel>
-        </Group>
+        {/* 右インスペクタ: RightInspector */}
+        <div className="w-[320px] min-w-[280px] shrink-0 border-l border-[#3a291f] bg-[#15100d]">
+          <RightInspector
+            selectedItem={selectedItemData}
+            selectedTrack={selectedItemTrack}
+            onUpdateItem={handleUpdateItem}
+            subtitles={subtitles}
+            markers={markers}
+            suggestions={aiSuggestions}
+            messages={chatMessages}
+            selectedSubtitleId={selectedSubtitleId}
+            playheadSeconds={playheadSeconds}
+            zoomLevel={zoomLevel}
+            cutApplied={cutApplied}
+            styleName={projectStyle?.name ?? undefined}
+            subtitleDisplayMode={subtitleDisplaySettings.mode}
+            subtitleIntervalSeconds={subtitleDisplaySettings.intervalSeconds}
+            playbackRate={playbackRate}
+            onSendPrompt={handleSendPrompt}
+            onSendCompositionChat={(msg) => { void handleSendCompositionChat(msg) }}
+            onApplySuggestion={(id) => {
+              void handleApplySuggestion(id)
+            }}
+            onPreviewSuggestion={handlePreviewSuggestion}
+            onZoomChange={setZoomLevel}
+            onSelectSubtitle={(index) => {
+              selectSubtitleById(subtitles[index]?.id ?? null)
+            }}
+            onEditSubtitle={(index) => {
+              selectSubtitleById(subtitles[index]?.id ?? null)
+              openSubtitleModal(index)
+            }}
+            onJumpToMarker={handleJumpToMarker}
+            onResetPlaybackRate={() => setPlaybackRate(1)}
+            onAddSubtitle={handleAddSubtitle}
+            onOpenStyle={() => router.push(`/styles?projectId=${projectId}`)}
+            onSubtitleDisplayModeChange={(mode) =>
+              setSubtitleDisplaySettings((current) => ({ ...current, mode }))
+            }
+            onSubtitleIntervalSecondsChange={(seconds) =>
+              setSubtitleDisplaySettings((current) => ({ ...current, intervalSeconds: seconds }))
+            }
+          />
+        </div>
       </main>
 
       {isSubtitleModalOpen && currentSubtitle ? (
@@ -1052,6 +1201,29 @@ export default function EditPage() {
             void handleExport(settings)
           }}
           planId={billingData?.planId ?? 'free'}
+        />
+      ) : null}
+
+      {thumbnailStore.isModalOpen ? (
+        <ThumbnailGeneratorModal
+          projectId={projectId}
+          playheadSeconds={playheadSeconds}
+          durationSeconds={durationSeconds}
+          playbackSegments={playbackSegments}
+          onClose={() => thumbnailStore.closeModal()}
+        />
+      ) : null}
+
+      {exportCompleteUrl ? (
+        <ExportCompleteSheet
+          downloadUrl={exportCompleteUrl}
+          onClose={() => setExportCompleteUrl(null)}
+          onOpenThumbnailModal={() => {
+            setExportCompleteUrl(null)
+            thumbnailStore.openModal()
+          }}
+          hasSrtExport={getPlanDefinition(billingData?.planId ?? 'free').hasSrtExport}
+          projectId={projectId}
         />
       ) : null}
     </div>

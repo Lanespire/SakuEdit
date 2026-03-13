@@ -13,7 +13,6 @@ import { getPlaybackSegments, normalizeSilenceRegions } from '@/lib/editor'
 import type { ExportQuality, SubtitleExportOption } from '@/lib/plans'
 import { serializeSegmentsToSrt } from '@/lib/remotion-captions-adapter'
 import {
-  createVideoBucketSignedGetUrl,
   uploadFileToVideoBucket,
   uploadTextToVideoBucket,
 } from '@/lib/server/video-bucket'
@@ -21,6 +20,7 @@ import {
   generateThumbnail,
   renderWithRemotion,
 } from '@/lib/video-processor'
+import { createVideoBucketSignedGetUrl } from '@/lib/server/video-bucket'
 
 function normalizeQuality(value: unknown): ExportQuality {
   return value === '1080p' || value === '4k' ? value : '720p'
@@ -198,14 +198,7 @@ export async function POST(request: NextRequest) {
     })
 
     try {
-      const sourceObjectKey = buildExportObjectKey(
-        projectId,
-        exportJob.id,
-        `source${path.extname(sourceVideo.filename || sourceVideo.storagePath) || '.mp4'}`,
-      )
-      await uploadFileToVideoBucket(sourceVideo.storagePath, sourceObjectKey, {
-        contentType: sourceVideo.mimeType || 'video/mp4',
-      })
+      const sourceObjectKey = sourceVideo.storagePath
 
       const sourceVideoUrl = await createVideoBucketSignedGetUrl(sourceObjectKey, {
         expiresInSeconds: 60 * 60 * 24,

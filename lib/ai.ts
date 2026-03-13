@@ -32,6 +32,8 @@ const MODELS = {
   geminiFlash: 'google/gemini-3-flash-preview',
   // Gemini 3.1 Pro (frontier reasoning, 1M context)
   geminiPro: 'google/gemini-3.1-pro-preview',
+  // Gemini 3.1 Flash Image Preview (画像生成対応)
+  geminiFlashImage: 'google/gemini-3.1-flash-image-preview',
 } as const
 
 // Default model for anonymous users (cost-efficient)
@@ -161,20 +163,6 @@ function createFallbackVisualProfile(): VisualStyleProfile {
     },
     creatorStyleSummary: 'Visual analysis unavailable',
   }
-}
-
-// ============================================
-// ASR Types
-// ============================================
-interface WhisperSegment {
-  start: number
-  end: number
-  text: string
-}
-
-interface LocalWhisperResponse {
-  text?: string
-  segments?: WhisperSegment[]
 }
 
 interface ASRResult {
@@ -378,7 +366,7 @@ Rules:
 }
 
 // ============================================
-// Audio Transcription (Remotion Whisper primary, local whisper fallback)
+// Audio Transcription (Remotion Whisper only)
 // ============================================
 export async function transcribeAudio(
   audioPath: string,
@@ -390,80 +378,11 @@ export async function transcribeAudio(
     throw new Error(`Audio file not found: ${audioPath}`)
   }
 
-  try {
-    const result = await transcribeWithRemotionWhisper(audioPath, language)
-    return {
-      text: result.text,
-      segments: result.segments,
-    }
-  } catch (error) {
-    const remotionError = getErrorMessage(error)
-    console.warn(
-      `Remotion whisper transcription failed, falling back to local whisper: ${remotionError}`
-    )
-
-    try {
-      return await transcribeWithLocalWhisper(audioPath, language)
-    } catch (fallbackError) {
-      throw new Error(
-        `Remotion whisper transcription failed (${remotionError}); local whisper fallback also failed: ${getErrorMessage(fallbackError)}`
-      )
-    }
+  const result = await transcribeWithRemotionWhisper(audioPath, language)
+  return {
+    text: result.text,
+    segments: result.segments,
   }
-}
-
-async function transcribeWithLocalWhisper(audioPath: string, language: string): Promise<ASRResult> {
-  const { spawn } = await import('child_process')
-  const path = await import('path')
-  const tmpDir = path.dirname(audioPath)
-
-  return new Promise((resolve, reject) => {
-    const args = [
-      audioPath,
-      '--language', language,
-      '--output_format', 'json',
-      '--output_dir', tmpDir,
-      '--model', 'base',
-      '--fp16', 'False',
-    ]
-
-    const whisper = spawn('whisper', args)
-    let stderr = ''
-
-    whisper.stderr.on('data', (data) => {
-      stderr += data.toString()
-    })
-
-    whisper.on('close', async (code) => {
-      if (code !== 0) {
-        reject(new Error(`Local whisper failed: ${stderr}`))
-        return
-      }
-
-      try {
-        const jsonPath = audioPath.replace(/\.[^.]+$/, '.json')
-        const content = await fs.readFile(jsonPath, 'utf-8')
-        const data = JSON.parse(content) as LocalWhisperResponse
-
-        const segments: ASRResult['segments'] = (data.segments || []).map((seg: WhisperSegment) => ({
-          start: seg.start,
-          end: seg.end,
-          text: seg.text.trim(),
-          speaker: undefined,
-        }))
-
-        resolve({ text: data.text || '', segments })
-
-        try { await fs.unlink(jsonPath) } catch {}
-      } catch (parseError) {
-        reject(new Error(`Failed to parse whisper output: ${parseError}`))
-      }
-    })
-
-    whisper.on('error', (err) => {
-      reject(new Error(`Failed to run whisper CLI. Install with: pip install openai-whisper. Error: ${err.message}`))
-    })
-  })
 }
 
 // ============================================

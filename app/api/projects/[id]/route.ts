@@ -75,6 +75,10 @@ export const GET = handleRoute(async (
       markers: {
         orderBy: { time: 'asc' },
       },
+      thumbnails: {
+        where: { status: 'COMPLETED' },
+        orderBy: { createdAt: 'desc' },
+      },
     },
   })
 
@@ -102,7 +106,7 @@ export const PATCH = handleRoute(async (
   const { id: projectId } = await params
   const body = await parseJson(request, updateProjectSchema)
 
-  await getOwnedProject(projectId, userId)
+  const currentProject = await getOwnedProject(projectId, userId)
 
   const updateData = pickDefined(body, [
     'name',
@@ -115,6 +119,10 @@ export const PATCH = handleRoute(async (
     'canceledAt',
     'lastError',
   ]) as Prisma.ProjectUpdateInput
+
+  if (body.status === 'DRAFT' && currentProject.status !== 'DRAFT') {
+    delete updateData.status
+  }
 
   const project = await prisma.project.update({
     where: { id: projectId },

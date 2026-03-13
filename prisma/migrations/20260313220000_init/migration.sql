@@ -3,7 +3,7 @@ CREATE TABLE "users" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "email" TEXT NOT NULL,
     "name" TEXT,
-    "emailVerified" DATETIME,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
     "image" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
@@ -13,9 +13,9 @@ CREATE TABLE "users" (
 CREATE TABLE "accounts" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
-    "providerType" TEXT NOT NULL,
+    "providerType" TEXT,
     "providerId" TEXT NOT NULL,
-    "providerAccountId" TEXT NOT NULL,
+    "providerAccountId" TEXT NOT NULL DEFAULT '',
     "refreshToken" TEXT,
     "accessToken" TEXT,
     "expiresAt" DATETIME,
@@ -23,6 +23,10 @@ CREATE TABLE "accounts" (
     "scope" TEXT,
     "idToken" TEXT,
     "sessionState" TEXT,
+    "password" TEXT,
+    "accountId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -30,9 +34,12 @@ CREATE TABLE "accounts" (
 CREATE TABLE "sessions" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
     "expiresAt" DATETIME NOT NULL,
     "ipAddress" TEXT,
     "userAgent" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -90,6 +97,7 @@ CREATE TABLE "projects" (
     "status" TEXT NOT NULL DEFAULT 'DRAFT',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    "compositionData" TEXT,
     "progress" INTEGER NOT NULL DEFAULT 0,
     "progressMessage" TEXT,
     "startedAt" DATETIME,
@@ -97,6 +105,7 @@ CREATE TABLE "projects" (
     "canceledAt" DATETIME,
     "retryCount" INTEGER NOT NULL DEFAULT 0,
     "lastError" TEXT,
+    "selectedThumbnailId" TEXT,
     "styleId" TEXT,
     CONSTRAINT "projects_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "projects_styleId_fkey" FOREIGN KEY ("styleId") REFERENCES "styles" ("id") ON DELETE SET NULL ON UPDATE CASCADE
@@ -122,6 +131,32 @@ CREATE TABLE "videos" (
     "highlights" JSONB,
     "waveform" JSONB,
     CONSTRAINT "videos_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "processing_jobs" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "projectId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'QUEUED',
+    "progress" INTEGER NOT NULL DEFAULT 0,
+    "progressMessage" TEXT,
+    "requestKey" TEXT NOT NULL,
+    "pipelineVersion" TEXT NOT NULL,
+    "inputStoragePath" TEXT NOT NULL,
+    "optionsJson" TEXT,
+    "outputVideoPath" TEXT,
+    "audioPath" TEXT,
+    "srtPath" TEXT,
+    "thumbnailPath" TEXT,
+    "error" TEXT,
+    "attempt" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "startedAt" DATETIME,
+    "completedAt" DATETIME,
+    "canceledAt" DATETIME,
+    "lastHeartbeatAt" DATETIME,
+    CONSTRAINT "processing_jobs_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -238,9 +273,30 @@ CREATE TABLE "styles" (
     "subtitleSettings" JSONB,
     "bgmSettings" JSONB,
     "tempoSettings" JSONB,
+    "visualProfile" JSONB,
     "referenceUrl" TEXT,
     "sourceChannel" TEXT,
     CONSTRAINT "styles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "thumbnails" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "projectId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "mode" TEXT NOT NULL,
+    "templateId" TEXT,
+    "prompt" TEXT NOT NULL,
+    "stylePrompt" TEXT,
+    "inputImages" TEXT,
+    "imageUrl" TEXT,
+    "imagePath" TEXT,
+    "width" INTEGER NOT NULL DEFAULT 1280,
+    "height" INTEGER NOT NULL DEFAULT 720,
+    "error" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "thumbnails_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -255,12 +311,28 @@ CREATE TABLE "export_jobs" (
     "videoUrl" TEXT,
     "srtUrl" TEXT,
     "thumbnailUrl" TEXT,
+    "videoPath" TEXT,
+    "srtPath" TEXT,
+    "thumbnailPath" TEXT,
+    "sourceObjectKey" TEXT,
     "error" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "startedAt" DATETIME,
     "completedAt" DATETIME,
     "canceledAt" DATETIME,
     CONSTRAINT "export_jobs_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "anonymous_usages" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "fingerprint" TEXT NOT NULL,
+    "dailyCount" INTEGER NOT NULL DEFAULT 0,
+    "lastResetAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "totalCount" INTEGER NOT NULL DEFAULT 0,
+    "firstSeenAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastSeenAt" DATETIME NOT NULL,
+    "blockedUntil" DATETIME
 );
 
 -- CreateTable
@@ -294,7 +366,10 @@ CREATE TABLE "ai_suggestions" (
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "accounts_providerId_providerAccountId_key" ON "accounts"("providerId", "providerAccountId");
+CREATE UNIQUE INDEX "accounts_providerId_accountId_key" ON "accounts"("providerId", "accountId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "sessions_token_key" ON "sessions"("token");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "verification_tokens_token_key" ON "verification_tokens"("token");
@@ -309,4 +384,20 @@ CREATE UNIQUE INDEX "subscriptions_userId_key" ON "subscriptions"("userId");
 CREATE UNIQUE INDEX "plans_name_key" ON "plans"("name");
 
 -- CreateIndex
+CREATE INDEX "processing_jobs_projectId_status_idx" ON "processing_jobs"("projectId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "processing_jobs_projectId_requestKey_key" ON "processing_jobs"("projectId", "requestKey");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "timelines_projectId_key" ON "timelines"("projectId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "anonymous_usages_fingerprint_key" ON "anonymous_usages"("fingerprint");
+
+-- CreateIndex
+CREATE INDEX "anonymous_usages_fingerprint_idx" ON "anonymous_usages"("fingerprint");
+
+-- CreateIndex
+CREATE INDEX "anonymous_usages_lastResetAt_idx" ON "anonymous_usages"("lastResetAt");
+

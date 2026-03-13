@@ -75,6 +75,35 @@ function getSubtitlePosition(position: string | undefined) {
   }
 }
 
+function getSubtitleOpacity(
+  frame: number,
+  startFrame: number,
+  endFrame: number,
+) {
+  const duration = endFrame - startFrame
+
+  if (duration <= 1) {
+    return 1
+  }
+
+  if (duration <= 12) {
+    return interpolate(frame, [startFrame, startFrame + duration / 2, endFrame], [0, 1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    })
+  }
+
+  return interpolate(
+    frame,
+    [startFrame, startFrame + 6, endFrame - 6, endFrame],
+    [0, 1, 1, 0],
+    {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    },
+  )
+}
+
 export const VideoComposition: React.FC<VideoCompositionProps> = ({
   videoUrl,
   subtitles = [],
@@ -104,20 +133,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
     : 0
 
   const subtitleOpacity = currentSubtitle
-    ? interpolate(
-        frame,
-        [
-          subtitleStartFrame,
-          subtitleStartFrame + 6,
-          Math.max(subtitleStartFrame + 6, subtitleEndFrame - 6),
-          subtitleEndFrame,
-        ],
-        [0, 1, 1, 0],
-        {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        },
-      )
+    ? getSubtitleOpacity(frame, subtitleStartFrame, subtitleEndFrame)
     : 0
 
   const subtitleScale = currentSubtitle
