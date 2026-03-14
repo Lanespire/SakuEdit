@@ -1,14 +1,39 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { readFile } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const ONE_HOUR_IN_SECONDS = 60 * 60
 
 let s3Client: S3Client | null = null
+let cachedSstOutputs: { bucketName?: string } | null | undefined
+
+function getSstOutputs() {
+  if (cachedSstOutputs !== undefined) {
+    return cachedSstOutputs
+  }
+
+  const outputsPath = path.join(process.cwd(), '.sst', 'outputs.json')
+  if (!existsSync(outputsPath)) {
+    cachedSstOutputs = null
+    return cachedSstOutputs
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(outputsPath, 'utf-8')) as { bucketName?: string }
+    cachedSstOutputs = parsed
+    return cachedSstOutputs
+  } catch {
+    cachedSstOutputs = null
+    return cachedSstOutputs
+  }
+}
 
 export function getVideoBucketName() {
-  const bucketName = process.env.VIDEO_BUCKET_NAME
+  const bucketName =
+    process.env.VIDEO_BUCKET_NAME ||
+    (process.env.NODE_ENV === 'development' ? getSstOutputs()?.bucketName : undefined)
 
   if (!bucketName) {
     throw new Error('VIDEO_BUCKET_NAME is required')
@@ -18,7 +43,10 @@ export function getVideoBucketName() {
 }
 
 export function getAwsRegion() {
-  const region = process.env.VIDEO_BUCKET_REGION
+  const region =
+    process.env.VIDEO_BUCKET_REGION ||
+    process.env.AWS_REGION ||
+    (process.env.NODE_ENV === 'development' ? 'ap-northeast-1' : undefined)
 
   if (!region) {
     throw new Error('VIDEO_BUCKET_REGION is required')

@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -54,7 +55,7 @@ function SignInPageContent() {
     <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-          <span className="text-3xl">🎬</span>
+          <Image src="/logo.svg" alt="SakuEdit" width={36} height={36} />
           <span className="text-2xl font-bold text-[#2d1f18] dark:text-white">SakuEdit</span>
         </Link>
 

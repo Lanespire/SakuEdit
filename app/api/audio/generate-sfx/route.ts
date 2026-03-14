@@ -24,8 +24,10 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'audio/mpeg' },
     })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown error'
+    console.error('SFX generation error:', error)
+    const message = process.env.NODE_ENV === 'production'
+      ? '効果音の生成中にエラーが発生しました'
+      : error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

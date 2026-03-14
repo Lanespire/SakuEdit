@@ -94,8 +94,8 @@ npx sst dev --stage dev
 1. ユーザー登録とログイン
 2. 動画アップロード
 3. 処理開始
-4. 編集画面で進捗が見える
-5. 完了後に字幕、サムネイル、出力動画が見える
+4. `/edit/[id]` で処理進捗が見える
+5. 完了後に RVE editor が開き、source video と timeline が見える
 6. mp4 ダウンロードが通る
 
 ### 7. build を確認する
@@ -176,7 +176,7 @@ npx sst deploy --stage production
 2. 動画アップロードできる
 3. `VideoProcessor` が起動する
 4. 音声抽出、字幕生成、無音カット、レンダリング、サムネイル生成が完走する
-5. 編集画面で成果物が見える
+5. 編集画面で RVE preview / timeline / export 導線が見える
 6. mp4 / SRT / thumbnail が取得できる
 
 ### 6. 冪等性を確認する
@@ -195,6 +195,8 @@ npx sst deploy --stage production
 - `ffmpeg` `ffprobe` `Remotion CLI` `whisper` が足りない場合は、処理途中ではなく起動直後に失敗します
 - 成果物は deterministic path に保存されます
 - download / thumbnail は latest completed job を優先参照します
+- `PROCESSING / 80% / Rendering with Remotion...` は長めになりやすく、短尺でも数分かかることがあります
+- stale な `PROCESSING` job は `/api/projects/[id]` の取得時に自動で `QUEUED` に戻して再実行します
 
 ---
 

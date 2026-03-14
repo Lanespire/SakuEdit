@@ -40,6 +40,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "../ui/sidebar";
 import {
   Tooltip,
@@ -60,6 +61,8 @@ interface DefaultSidebarProps {
   showIconTitles?: boolean;
 }
 
+const DEFAULT_SIDEBAR_WIDTH = 448;
+
 /**
  * DefaultSidebar Component
  *
@@ -73,10 +76,61 @@ interface DefaultSidebarProps {
 export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
   logo,
   disabledPanels = [],
-  showIconTitles = true,
+  showIconTitles = false,
 }) => {
   const { activePanel, setActivePanel, setIsOpen } = useEditorSidebar();
+  const { open, width: sidebarWidth, setWidth } = useSidebar();
   const { setSelectedOverlayId, selectedOverlayId, overlays } = useEditorContext();
+  const [isResizingSidebar, setIsResizingSidebar] = React.useState(false);
+  const resizeStartXRef = React.useRef(0);
+  const resizeStartWidthRef = React.useRef(sidebarWidth);
+
+  React.useEffect(() => {
+    if (!isResizingSidebar) {
+      return;
+    }
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const deltaX = event.clientX - resizeStartXRef.current;
+      setWidth(resizeStartWidthRef.current + deltaX);
+    };
+
+    const stopResizing = () => {
+      setIsResizingSidebar(false);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "ew-resize";
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", stopResizing);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", stopResizing);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+  }, [isResizingSidebar, setWidth]);
+
+  const handleResizeStart = React.useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (!open) {
+        return;
+      }
+
+      event.preventDefault();
+      resizeStartXRef.current = event.clientX;
+      resizeStartWidthRef.current = sidebarWidth;
+      setIsResizingSidebar(true);
+    },
+    [open, sidebarWidth]
+  );
+
+  const handleResizeReset = React.useCallback(() => {
+    setWidth(DEFAULT_SIDEBAR_WIDTH);
+  }, [setWidth]);
 
   // Get the selected overlay to check its type
   const selectedOverlay = selectedOverlayId !== null 
@@ -203,6 +257,7 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
     <Sidebar
       collapsible="icon"
       className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
+      style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
     >
       {/* First sidebar */}
       <Sidebar
@@ -217,7 +272,7 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
                   <div className="flex aspect-square size-9 items-center justify-center rounded-lg">
                     {logo || (
                       <img
-                        src="/icons/logo-rve.png"
+                        src="/logo.svg"
                         alt="SakuEdit ロゴ"
                         width={27}
                         height={27}
@@ -290,7 +345,7 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
       </Sidebar>
 
       {/* Second sidebar */}
-      <Sidebar collapsible="none" className="hidden flex-1 md:flex bg-background">
+      <Sidebar collapsible="none" className="relative hidden min-w-0 flex-1 bg-background md:flex">
       <SidebarHeader className="gap-3.5 border-b border-border px-4 py-3">
           <div className="flex w-full items-center justify-between">
             <div className="flex items-center justify-between w-full">
@@ -311,7 +366,20 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
             </div>
           </div>
         </SidebarHeader>
-        <SidebarContent className="bg-background px-2 pt-1">
+        <div
+          aria-label="サイドバー幅を調整"
+          className="absolute inset-y-0 right-0 z-20 hidden w-2 cursor-ew-resize md:block"
+          onMouseDown={handleResizeStart}
+          onDoubleClick={handleResizeReset}
+          title="ドラッグで幅調整 / ダブルクリックで初期化"
+        >
+          <div
+            className={`mx-auto h-full w-px transition-colors ${
+              isResizingSidebar ? "bg-primary" : "bg-border"
+            }`}
+          />
+        </div>
+        <SidebarContent className="min-w-0 bg-background px-2 pt-1 pr-3">
           {renderActivePanel()}
         </SidebarContent>
       </Sidebar>

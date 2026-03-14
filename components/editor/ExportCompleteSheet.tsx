@@ -91,7 +91,7 @@ export default function ExportCompleteSheet({
             <button
               type="button"
               onClick={() => {
-                window.location.href = `/api/projects/${projectId}/subtitles?format=srt`
+                window.location.href = `/api/download/${projectId}?type=srt`
               }}
               className="flex w-full items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4 text-left transition-colors hover:bg-white/8"
             >

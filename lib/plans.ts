@@ -24,7 +24,22 @@ export interface PlanDefinition {
 }
 
 export const PLAN_ORDER: PlanId[] = ['free', 'pro', 'business', 'enterprise']
+export const PUBLIC_PLAN_IDS: PlanId[] = ['free', 'pro', 'business']
 export const BILLABLE_PLAN_IDS: PlanId[] = ['pro', 'business']
+
+export const ONE_TIME_PACK_SUGGESTION = {
+  id: 'one-time-pack',
+  displayName: '買い切りパック',
+  description: '月額契約をせずに 1 から 3 本仕上げたい方向けの設計案',
+  priceLabel: '¥4,980',
+  periodLabel: '/買い切り',
+  processingMinutes: 180,
+  validDays: 30,
+  maxSingleVideoMinutes: 60,
+  maxQuality: '1080p' as const,
+  hasSrtExport: true,
+  hasThumbnail: true,
+}
 
 export const QUALITY_MULTIPLIERS: Record<ExportQuality, number> = {
   '720p': 1,
@@ -70,13 +85,13 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasSrtExport: true,
     hasThumbnail: true,
     monthlyThumbnailCount: 10,
-    hasPriorityQueue: true,
+    hasPriorityQueue: false,
     teamSeats: 0,
   },
   business: {
     id: 'business',
     displayName: 'Business',
-    description: '運用フェーズの個人・少人数チーム向け',
+    description: '4K書き出しと長尺動画に対応した運用向け',
     monthlyPriceYen: 8980,
     priceLabel: '¥8,980',
     periodLabel: '/月',
@@ -90,13 +105,13 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasSrtExport: true,
     hasThumbnail: true,
     monthlyThumbnailCount: 50,
-    hasPriorityQueue: true,
-    teamSeats: 3,
+    hasPriorityQueue: false,
+    teamSeats: 0,
   },
   enterprise: {
     id: 'enterprise',
     displayName: 'Enterprise',
-    description: '大量処理・4K・SLAが必要な法人向け',
+    description: '大量処理の個別相談向け',
     monthlyPriceYen: null,
     priceLabel: '要相談',
     periodLabel: '',
@@ -110,7 +125,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasSrtExport: true,
     hasThumbnail: true,
     monthlyThumbnailCount: 999,
-    hasPriorityQueue: true,
+    hasPriorityQueue: false,
     teamSeats: 0,
   },
 }
@@ -144,4 +159,3 @@ export function calculateBilledSeconds(durationSeconds: number, quality: ExportQ
 export function requiresSrtOption(subtitleOption: SubtitleExportOption): boolean {
   return subtitleOption === 'srt' || subtitleOption === 'both'
 }
-

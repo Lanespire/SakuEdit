@@ -73,6 +73,7 @@ export default $config({
     );
 
     const stripeWebhookUrl = process.env.STRIPE_WEBHOOK_URL;
+
     const stripeProvider = new stripe.Provider("StripeProvider", {
       apiKey: stripeSecretKey.value,
     });
@@ -209,8 +210,8 @@ export default $config({
         BETTER_AUTH_SECRET: betterAuthSecret,
         PROCESSING_WORKER_TOKEN: processingWorkerToken,
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: stripePublishableKey.value,
-        STRIPE_PRO_PRICE_ID: stripeResources?.pro.monthlyPriceId,
-        STRIPE_BUSINESS_PRICE_ID: stripeResources?.business.monthlyPriceId,
+        STRIPE_PRO_PRICE_ID: stripeResources.pro.monthlyPriceId,
+        STRIPE_BUSINESS_PRICE_ID: stripeResources.business.monthlyPriceId,
       },
     });
 

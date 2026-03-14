@@ -1,4 +1,4 @@
-import { PLAN_DEFINITIONS, PLAN_ORDER } from '@/lib/plans'
+import { PLAN_DEFINITIONS, PUBLIC_PLAN_IDS } from '@/lib/plans'
 
 export const LEGAL_LAST_UPDATED = '2026年3月12日'
 
@@ -21,7 +21,7 @@ export const LEGAL_SERVICE_ENVIRONMENT = [
   '動画アップロードおよび書き出しデータのダウンロードが可能な安定したインターネット接続',
 ] as const
 
-export const LEGAL_BILLING_SUMMARY = PLAN_ORDER.map((planId) => {
+export const LEGAL_BILLING_SUMMARY = PUBLIC_PLAN_IDS.map((planId) => {
   const plan = PLAN_DEFINITIONS[planId]
 
   return {

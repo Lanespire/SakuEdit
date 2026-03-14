@@ -20,10 +20,13 @@ import { useIsMobile } from "../../hooks/use-mobile";
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+const SIDEBAR_WIDTH_STORAGE_KEY = "sidebar:width";
 const SIDEBAR_WIDTH = "24rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3.75rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+const SIDEBAR_MIN_WIDTH = 360;
+const SIDEBAR_MAX_WIDTH = 720;
 
 type SidebarContext = {
   state: "expanded" | "collapsed";
@@ -33,9 +36,52 @@ type SidebarContext = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  width: number;
+  setWidth: (width: number) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContext | null>(null);
+
+const getDefaultRootFontSize = () => {
+  if (typeof window === "undefined") {
+    return 16;
+  }
+
+  const fontSize = Number.parseFloat(
+    window.getComputedStyle(document.documentElement).fontSize
+  );
+
+  return Number.isFinite(fontSize) ? fontSize : 16;
+};
+
+const parseSidebarWidth = (
+  value: string | number | undefined,
+  fallback: string
+): number => {
+  const resolvedValue = value ?? fallback;
+
+  if (typeof resolvedValue === "number") {
+    return resolvedValue;
+  }
+
+  const trimmedValue = resolvedValue.trim();
+
+  if (trimmedValue.endsWith("rem")) {
+    return Number.parseFloat(trimmedValue) * getDefaultRootFontSize();
+  }
+
+  if (trimmedValue.endsWith("px")) {
+    return Number.parseFloat(trimmedValue);
+  }
+
+  const parsedValue = Number.parseFloat(trimmedValue);
+  return Number.isFinite(parsedValue)
+    ? parsedValue
+    : parseSidebarWidth(fallback, fallback);
+};
+
+const clampSidebarWidth = (width: number) =>
+  Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width));
 
 function useSidebar() {
   const context = React.useContext(SidebarContext);
@@ -68,10 +114,33 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile();
     const [openMobile, setOpenMobile] = React.useState(false);
+    const styleVars = (style ?? {}) as React.CSSProperties &
+      Record<string, string | number | undefined>;
+    const configuredSidebarWidth = React.useMemo(
+      () => parseSidebarWidth(styleVars["--sidebar-width"], SIDEBAR_WIDTH),
+      [styleVars]
+    );
+    const configuredSidebarIconWidth =
+      styleVars["--sidebar-width-icon"] ?? SIDEBAR_WIDTH_ICON;
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen);
+    const [width, setWidthState] = React.useState(() => {
+      if (typeof window === "undefined") {
+        return clampSidebarWidth(configuredSidebarWidth);
+      }
+
+      const storedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      if (storedWidth) {
+        const parsedWidth = Number.parseFloat(storedWidth);
+        if (Number.isFinite(parsedWidth)) {
+          return clampSidebarWidth(parsedWidth);
+        }
+      }
+
+      return clampSidebarWidth(configuredSidebarWidth);
+    });
     const open = openProp ?? _open;
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
@@ -88,6 +157,17 @@ const SidebarProvider = React.forwardRef<
       },
       [setOpenProp, open]
     );
+    const setWidth = React.useCallback((nextWidth: number) => {
+      const clampedWidth = clampSidebarWidth(nextWidth);
+      setWidthState(clampedWidth);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          SIDEBAR_WIDTH_STORAGE_KEY,
+          `${clampedWidth}`
+        );
+      }
+    }, []);
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
@@ -95,6 +175,19 @@ const SidebarProvider = React.forwardRef<
         ? setOpenMobile((open) => !open)
         : setOpen((open) => !open);
     }, [isMobile, setOpen, setOpenMobile]);
+
+    React.useEffect(() => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const storedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      if (storedWidth) {
+        return;
+      }
+
+      setWidthState(clampSidebarWidth(configuredSidebarWidth));
+    }, [configuredSidebarWidth]);
 
     // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
@@ -125,8 +218,20 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        width,
+        setWidth,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [
+        state,
+        open,
+        setOpen,
+        isMobile,
+        openMobile,
+        setOpenMobile,
+        toggleSidebar,
+        width,
+        setWidth,
+      ]
     );
 
     return (
@@ -135,9 +240,9 @@ const SidebarProvider = React.forwardRef<
           <div
             style={
               {
-                "--sidebar-width": SIDEBAR_WIDTH,
-                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
                 ...style,
+                "--sidebar-width": `${width}px`,
+                "--sidebar-width-icon": configuredSidebarIconWidth,
               } as React.CSSProperties
             }
             className={cn(

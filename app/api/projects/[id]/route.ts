@@ -4,6 +4,8 @@ import { z } from 'zod'
 import prisma from '@/lib/db'
 import { getBillingSnapshot } from '@/lib/billing'
 import { pickDefined } from '@/lib/server/object'
+import { dispatchProcessingJobOrMarkFailure } from '@/lib/server/processing-dispatch'
+import { recoverStaleProcessingJob } from '@/lib/server/processing-jobs'
 import {
   forbidden,
   getRequiredUserId,
@@ -12,6 +14,9 @@ import {
   ok,
   parseJson,
 } from '@/lib/server/route'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 const updateProjectSchema = z.object({
   name: z.string().trim().min(1).optional(),
@@ -47,6 +52,15 @@ export const GET = handleRoute(async (
 ) => {
   const userId = await getRequiredUserId(request)
   const { id: projectId } = await params
+  await getOwnedProject(projectId, userId)
+
+  const recoveredJob = await recoverStaleProcessingJob(projectId)
+  if (recoveredJob.recovered && recoveredJob.job) {
+    await dispatchProcessingJobOrMarkFailure({
+      job: recoveredJob.job,
+      projectId,
+    })
+  }
 
   const project = await prisma.project.findUnique({
     where: {

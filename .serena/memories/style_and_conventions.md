@@ -1,0 +1,1 @@
+コードは TypeScript/React 関数コンポーネント中心。App Router 構成で `app/` にルート、`components/` に UI、`lib/` に hooks/store/util。状態管理は Zustand を使用。日本語 UI 文言が多く、Tailwind クラスでスタイリング。完了時は少なくとも `npm run lint`、影響大なら `npm run build` と関連 E2E を確認する。

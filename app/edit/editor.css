@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@import "../reactvideoeditor/pro/styles.css" layer(utilities);
+@import "../reactvideoeditor/pro/styles.utilities.css";
+
+@config "../../tailwind.config.ts";
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
+}
+
+@layer utilities {
+  .font-normal {
+    font-weight: 300;
+  }
+}
+
+.sakuedit-rve-shell {
+  min-height: 100dvh;
+}
+

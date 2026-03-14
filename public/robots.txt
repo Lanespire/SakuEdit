@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /edit/
+Disallow: /processing/
+Disallow: /projects/
+Disallow: /style-analysis/
+
+Sitemap: https://sakuedit.com/sitemap.xml

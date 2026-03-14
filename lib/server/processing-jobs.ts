@@ -254,6 +254,61 @@ export async function getLatestCompletedProcessingJob(projectId: string) {
   })
 }
 
+export async function recoverStaleProcessingJob(projectId: string) {
+  const staleJob = await prisma.processingJob.findFirst({
+    where: {
+      projectId,
+      status: 'PROCESSING',
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+  })
+
+  if (!staleJob || !isProcessingJobStale(staleJob)) {
+    return {
+      recovered: false,
+      job: null,
+    }
+  }
+
+  const updateResult = await prisma.processingJob.updateMany({
+    where: {
+      id: staleJob.id,
+      status: 'PROCESSING',
+      lastHeartbeatAt: staleJob.lastHeartbeatAt,
+    },
+    data: {
+      status: 'QUEUED',
+      progress: 0,
+      progressMessage: getQueueStatusMessage(),
+      error: null,
+      startedAt: null,
+      completedAt: null,
+      canceledAt: null,
+      lastHeartbeatAt: null,
+    },
+  })
+
+  if (updateResult.count === 0) {
+    return {
+      recovered: false,
+      job: null,
+    }
+  }
+
+  await mirrorProjectQueueState(projectId)
+
+  const job = await prisma.processingJob.findUnique({
+    where: { id: staleJob.id },
+  })
+
+  return {
+    recovered: true,
+    job,
+  }
+}
+
 export async function claimProcessingJob(jobId: string) {
   const startedAt = new Date()
   const result = await prisma.processingJob.updateMany({

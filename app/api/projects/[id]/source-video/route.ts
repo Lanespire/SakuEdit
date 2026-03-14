@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
-import { resolveProjectAssetUrl } from '@/lib/server/project-storage'
+import {
+  createLocalAssetResponse,
+  resolveLocalProjectAssetPath,
+  resolveProjectAssetUrl,
+} from '@/lib/server/project-storage'
 import { RouteError, forbidden, getRequiredUserId, notFound } from '@/lib/server/route'
 
 export async function GET(
@@ -31,6 +35,18 @@ export async function GET(
     const video = project.videos[0]
     if (!video?.storagePath) {
       return NextResponse.json({ error: 'Source video not found' }, { status: 404 })
+    }
+
+    const localPath = await resolveLocalProjectAssetPath(video.storagePath, {
+      projectId,
+      fileName: video.filename,
+      expectedSize: video.fileSize,
+    })
+
+    if (localPath) {
+      return createLocalAssetResponse(request, localPath, {
+        contentType: video.mimeType || 'video/mp4',
+      })
     }
 
     const signedUrl = await resolveProjectAssetUrl(video.storagePath, {

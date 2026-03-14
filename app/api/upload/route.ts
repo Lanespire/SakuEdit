@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     // Check for test mode (development only)
     const url = new URL(request.url)
     const testUserId = url.searchParams.get('testUserId')
-    const isTestMode = process.env.NODE_ENV === 'development' && testUserId
+    const isTestMode = process.env.NODE_ENV !== 'production' && testUserId
 
     let userId: string
 
@@ -240,8 +240,11 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error uploading video:', error)
+    const message = process.env.NODE_ENV === 'production'
+      ? '動画のアップロード中にエラーが発生しました'
+      : error instanceof Error ? error.message : 'Failed to upload video'
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to upload video' },
+      { error: message },
       { status: 500 }
     )
   }

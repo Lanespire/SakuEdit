@@ -12,6 +12,7 @@ import prisma from '@/lib/db'
 import { getPlaybackSegments, normalizeSilenceRegions } from '@/lib/editor'
 import type { ExportQuality, SubtitleExportOption } from '@/lib/plans'
 import { serializeSegmentsToSrt } from '@/lib/remotion-captions-adapter'
+import { extractPersistedExportState } from '@/lib/rve-state'
 import {
   uploadFileToVideoBucket,
   uploadTextToVideoBucket,
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
   try {
     const url = new URL(request.url)
     const testUserId = url.searchParams.get('testUserId')
-    const isTestMode = process.env.NODE_ENV === 'development' && testUserId
+    const isTestMode = process.env.NODE_ENV !== 'production' && testUserId
 
     let userId: string
 
@@ -204,8 +205,11 @@ export async function POST(request: NextRequest) {
         expiresInSeconds: 60 * 60 * 24,
         contentType: sourceVideo.mimeType || 'video/mp4',
       })
+      const persistedExportState = extractPersistedExportState(project.compositionData)
 
-      const subtitles = project.subtitles.map((sub) => ({
+      const subtitles = (persistedExportState?.subtitles.length
+        ? persistedExportState.subtitles
+        : project.subtitles.map((sub) => ({
         id: sub.id,
         text: sub.text,
         startTime: sub.startTime ?? 0,
@@ -215,17 +219,29 @@ export async function POST(request: NextRequest) {
         fontColor: sub.fontColor ?? '#FFFFFF',
         backgroundColor: sub.backgroundColor ?? '#00000080',
         isBold: sub.isBold ?? false,
+      }))).map((subtitle, index) => ({
+        id: 'id' in subtitle ? subtitle.id : `rve-subtitle-${index}`,
+        text: subtitle.text,
+        startTime: subtitle.startTime ?? 0,
+        endTime: subtitle.endTime ?? 0,
+        position: subtitle.position ?? 'bottom',
+        fontSize: subtitle.fontSize ?? 24,
+        fontColor: subtitle.fontColor ?? '#FFFFFF',
+        backgroundColor: subtitle.backgroundColor ?? '#00000080',
+        isBold: subtitle.isBold ?? false,
       }))
 
       const { width, height } = getRenderDimensions(quality)
-      const cutApplied = project.aiSuggestions.some(
-        (suggestion) => suggestion.type === 'SILENCE_CUT' && suggestion.isApplied,
-      )
-      const playbackSegments = getPlaybackSegments(
-        sourceVideo.duration,
-        normalizeSilenceRegions(sourceVideo.silenceDetected),
-        cutApplied,
-      )
+      const playbackSegments = persistedExportState?.playbackSegments ?? (() => {
+        const cutApplied = project.aiSuggestions.some(
+          (suggestion) => suggestion.type === 'SILENCE_CUT' && suggestion.isApplied,
+        )
+        return getPlaybackSegments(
+          sourceVideo.duration,
+          normalizeSilenceRegions(sourceVideo.silenceDetected),
+          cutApplied,
+        )
+      })()
 
       let srtKey: string | null = null
       if ((subtitleOption === 'srt' || subtitleOption === 'both') && subtitles.length > 0) {

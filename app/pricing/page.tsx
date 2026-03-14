@@ -1,74 +1,99 @@
 import Link from 'next/link'
-import { getPlanDefinition, PLAN_ORDER, type PlanId } from '@/lib/plans'
+import {
+  getPlanDefinition,
+  ONE_TIME_PACK_SUGGESTION,
+  PUBLIC_PLAN_IDS,
+  type PlanDefinition,
+  type PlanId,
+} from '@/lib/plans'
 
-const PLAN_FEATURES: Record<PlanId, Array<{ text: string; included: boolean }>> = {
+type PublicPlanId = Extract<PlanId, 'free' | 'pro' | 'business'>
+
+const PLAN_FEATURES: Record<PublicPlanId, string[]> = {
   free: [
-    { text: '月90分まで処理', included: true },
-    { text: '1本あたり最大10分', included: true },
-    { text: '720p書き出し', included: true },
-    { text: 'ウォーターマーク付き', included: true },
-    { text: '1080p書き出し', included: false },
-    { text: 'SRT字幕ファイル', included: false },
-    { text: 'サムネイル生成', included: false },
-    { text: '4K書き出し', included: false },
+    '月90分まで処理',
+    '1本あたり最大10分',
+    '720p書き出し',
+    '字幕の焼き込み書き出し',
+    'ウォーターマーク付き',
   ],
   pro: [
-    { text: '月600分まで処理', included: true },
-    { text: '1本あたり最大30分', included: true },
-    { text: '1080p書き出し', included: true },
-    { text: 'SRT字幕ファイル', included: true },
-    { text: 'サムネイル生成', included: true },
-    { text: 'ウォーターマークなし', included: true },
-    { text: '4K書き出し', included: false },
-    { text: '優先処理', included: true },
+    '月600分まで処理',
+    '1本あたり最大30分',
+    '1080p書き出し',
+    'SRT字幕ファイル',
+    'サムネイル生成',
+    'ウォーターマークなし',
+    'スタイル分析 月10回',
   ],
   business: [
-    { text: '月2,400分まで処理', included: true },
-    { text: '1本あたり最大90分', included: true },
-    { text: '1080p書き出し', included: true },
-    { text: '4K書き出し（1.5x消費）', included: true },
-    { text: 'SRT字幕ファイル', included: true },
-    { text: 'サムネイル生成', included: true },
-    { text: '優先キュー', included: true },
-    { text: 'チーム共有 3席まで', included: true },
-  ],
-  enterprise: [
-    { text: '月3,000分超の処理枠を個別設計', included: true },
-    { text: '4K書き出し', included: true },
-    { text: '専用キュー / SLA相談', included: true },
-    { text: 'チーム共有・権限制御', included: true },
-    { text: '請求書払い対応', included: true },
-    { text: '導入支援', included: true },
-    { text: '超過利用の従量設計', included: true },
-    { text: '無制限固定額', included: false },
+    '月2,400分まで処理',
+    '1本あたり最大90分',
+    '4K書き出し対応',
+    'SRT字幕ファイル',
+    'サムネイル生成',
+    'ウォーターマークなし',
+    'スタイル分析 月50回',
   ],
 }
 
+const COMPARISON_ROWS: Array<{
+  label: string
+  render: (plan: PlanDefinition) => string
+}> = [
+  {
+    label: '月額',
+    render: (plan) =>
+      plan.monthlyPriceYen === null ? '個別見積もり' : `${plan.priceLabel}${plan.periodLabel}`,
+  },
+  {
+    label: '月間処理分数',
+    render: (plan) => `${plan.monthlyProcessingMinutes}分`,
+  },
+  {
+    label: '1本あたり最大',
+    render: (plan) => `${plan.maxSingleVideoMinutes}分`,
+  },
+  {
+    label: '書き出し品質',
+    render: (plan) => plan.maxQuality,
+  },
+  {
+    label: 'SRT書き出し',
+    render: (plan) => (plan.hasSrtExport ? '対応' : '非対応'),
+  },
+  {
+    label: 'サムネイル生成',
+    render: (plan) => (plan.hasThumbnail ? '対応' : '非対応'),
+  },
+  {
+    label: 'スタイル分析',
+    render: (plan) =>
+      plan.monthlyStyleAnalysisCount > 0 ? `月${plan.monthlyStyleAnalysisCount}回` : '非対応',
+  },
+  {
+    label: 'ウォーターマーク',
+    render: (plan) => (plan.hasWatermark ? 'あり' : 'なし'),
+  },
+]
+
 const BILLING_MESSAGES: Record<string, string> = {
-  success: 'Stripe Checkoutが完了しました。Webhook反映後にプランが更新されます。',
-  cancelled: 'Checkoutをキャンセルしました。',
+  success: 'Stripe Checkout が完了しました。Webhook 反映後にプランが更新されます。',
+  cancelled: 'Checkout をキャンセルしました。',
   'already-active': 'すでに同じプランが有効です。',
 }
 
-function PlanCta({ planId, label, popular }: { planId: PlanId; label: string; popular: boolean }) {
-  const className = `w-full py-3 rounded-xl font-bold text-sm transition-all ${
+function PlanCta({ planId, label, popular }: { planId: PublicPlanId; label: string; popular: boolean }) {
+  const className = `w-full rounded-xl py-3 text-sm font-bold transition-all ${
     popular
-      ? 'bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20'
-      : 'bg-[#f4ece6] dark:bg-white/10 text-[#2d1f18] dark:text-white hover:bg-[#ebe3dc] dark:hover:bg-white/20'
+      ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90'
+      : 'bg-[#f4ece6] text-[#2d1f18] hover:bg-[#ebe3dc]'
   }`
 
   if (planId === 'free') {
     return (
-      <Link href="/auth/signup" className={`${className} text-center`} data-test-id="cta-free">
+      <Link href="/auth/signup" className={`${className} block text-center`} data-test-id="cta-free">
         無料で始める
-      </Link>
-    )
-  }
-
-  if (planId === 'enterprise') {
-    return (
-      <Link href="/" className={`${className} text-center`} data-test-id="cta-enterprise">
-        お問い合わせ
       </Link>
     )
   }
@@ -89,169 +114,267 @@ export default async function PricingPage({
   searchParams: Promise<{ billing?: string }>
 }) {
   const { billing } = await searchParams
-  const plans = PLAN_ORDER.map((planId) => {
+  const visiblePlanIds = PUBLIC_PLAN_IDS.filter(
+    (planId) => planId === 'free' || getPlanDefinition(planId).checkoutEnabled,
+  ) as PublicPlanId[]
+
+  const plans = visiblePlanIds.map((planId) => {
     const plan = getPlanDefinition(planId)
     return {
-      id: plan.id,
-      name: plan.displayName,
-      price: plan.priceLabel,
-      period: plan.periodLabel,
-      description: plan.description,
-      cta: plan.ctaLabel,
+      ...plan,
       popular: plan.id === 'pro',
-      features: PLAN_FEATURES[plan.id],
+      features: PLAN_FEATURES[planId],
     }
   })
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark font-display selection:bg-primary/20">
+    <div className="min-h-screen bg-background-light font-display selection:bg-primary/20">
       <header
-        className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/95 backdrop-blur-md border-b border-[#f0e6df] px-6 py-4"
+        className="sticky top-0 z-50 border-b border-[#f0e6df] bg-white/85 px-6 py-4 backdrop-blur-md"
         data-test-id="pricing-header"
       >
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6">
           <Link href="/" className="flex items-center gap-2" data-test-id="header-logo">
-            <span className="text-2xl">🎬</span>
-            <span className="font-bold text-lg text-[#2d1f18] dark:text-white">SakuEdit</span>
+            <span className="font-bold text-lg text-[#2d1f18]">SakuEdit</span>
           </Link>
-          <Link
-            href="/home"
-            className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
-            data-test-id="header-start-button"
-          >
-            今すぐ始める
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="text-sm font-medium text-[#8a756b] transition-colors hover:text-[#2d1f18]"
+            >
+              LPに戻る
+            </Link>
+            <Link
+              href="/home"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary/90"
+              data-test-id="header-start-button"
+            >
+              今すぐ始める
+            </Link>
+          </div>
         </div>
       </header>
 
-      <section className="pt-16 pb-12 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-bold mb-4">
-            処理分数ベースで明朗会計
+      <section className="px-4 pb-10 pt-16">
+        <div className="mx-auto max-w-4xl text-center">
+          <span className="mb-4 inline-block rounded-full bg-primary/10 px-4 py-1.5 text-sm font-bold text-primary">
+            今ある機能だけで比較
           </span>
-          <h1 className="text-4xl md:text-5xl font-black text-[#2d1f18] dark:text-white mb-4 leading-tight">
+          <h1 className="mb-4 text-4xl font-black leading-tight text-[#2d1f18] md:text-5xl">
             シンプルな料金プラン
           </h1>
-          <p className="text-lg text-[#8a756b] dark:text-[#9e8b7d] max-w-2xl mx-auto">
-            月間の処理分数で使える量を明確化しています。4K書き出しはBusiness以上で利用でき、処理分数を1.5倍消費します。
+          <p className="mx-auto max-w-3xl text-lg text-[#8a756b]">
+            いま比較できるのは、処理分数、書き出し品質、SRT、サムネイル生成です。
+            優先キューやチーム共有は現時点では提供していないため、料金表から外しています。
           </p>
         </div>
       </section>
 
       {billing && BILLING_MESSAGES[billing] && (
         <section className="px-4 pb-6">
-          <div className="max-w-3xl mx-auto rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-[#2d1f18] dark:text-white">
+          <div className="mx-auto max-w-3xl rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-[#2d1f18]">
             {BILLING_MESSAGES[billing]}
           </div>
         </section>
       )}
 
-      <section className="pb-20 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
-            {plans.map((plan) => (
-              <div
-                key={plan.id}
-                className={`relative bg-white dark:bg-[#2a1d15] rounded-2xl border-2 p-8 flex flex-col ${
-                  plan.popular
-                    ? 'border-primary shadow-xl shadow-primary/10'
-                    : 'border-[#f0e6df] dark:border-[#3a2a20]'
-                }`}
-                data-test-id={`plan-${plan.id}`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary text-white text-sm font-bold rounded-full shadow-lg">
-                    人気No.1
-                  </div>
-                )}
-
-                <div className="mb-6">
-                  <h3 className="text-xl font-bold text-[#2d1f18] dark:text-white mb-2">{plan.name}</h3>
-                  <p className="text-sm text-[#8a756b]">{plan.description}</p>
+      <section className="px-4 pb-10">
+        <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {plans.map((plan) => (
+            <div
+              key={plan.id}
+              className={`flex flex-col rounded-2xl border-2 bg-white p-8 ${
+                plan.popular ? 'border-primary shadow-xl shadow-primary/10' : 'border-[#f0e6df]'
+              }`}
+              data-test-id={`plan-${plan.id}`}
+            >
+              {plan.popular && (
+                <div className="mb-4 inline-flex w-fit rounded-full bg-primary px-3 py-1 text-xs font-bold text-white">
+                  おすすめ
                 </div>
+              )}
 
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-[#2d1f18] dark:text-white">{plan.price}</span>
-                  <span className="text-[#8a756b] text-sm">{plan.period}</span>
-                </div>
-
-                <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center gap-3">
-                      {feature.included ? (
-                        <span className="material-symbols-outlined text-primary text-[20px]">check_circle</span>
-                      ) : (
-                        <span className="material-symbols-outlined text-[#d0c0b6] text-[20px]">cancel</span>
-                      )}
-                      <span
-                        className={`text-sm ${
-                          feature.included
-                            ? 'text-[#2d1f18] dark:text-white'
-                            : 'text-[#b0a096] line-through'
-                        }`}
-                      >
-                        {feature.text}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                <PlanCta planId={plan.id} label={plan.cta} popular={plan.popular} />
+              <div className="mb-6">
+                <h2 className="mb-2 text-xl font-bold text-[#2d1f18]">{plan.displayName}</h2>
+                <p className="text-sm text-[#8a756b]">{plan.description}</p>
               </div>
-            ))}
+
+              <div className="mb-6">
+                <span className="text-4xl font-black text-[#2d1f18]">{plan.priceLabel}</span>
+                <span className="text-sm text-[#8a756b]">{plan.periodLabel}</span>
+              </div>
+
+              <ul className="mb-8 flex-1 space-y-3">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-3 text-sm text-[#2d1f18]">
+                    <span className="mt-0.5 text-primary">●</span>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <PlanCta planId={plan.id as PublicPlanId} label={plan.ctaLabel} popular={plan.popular} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="px-4 pb-20">
+        <div className="mx-auto max-w-6xl rounded-3xl border border-[#eadfd7] bg-white p-6 shadow-sm">
+          <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-[#2d1f18]">機能比較</h2>
+              <p className="mt-2 text-sm text-[#8a756b]">
+                Free は体験用、Pro は継続利用、Business は長尺と 4K が必要な運用向けです。
+              </p>
+            </div>
+            <p className="text-xs text-[#8a756b]">4K 書き出し時は処理分数を 1.5 倍消費します。</p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr>
+                  <th className="border-b border-[#eadfd7] px-4 py-3 text-left text-sm font-bold text-[#8a756b]">
+                    項目
+                  </th>
+                  {plans.map((plan) => (
+                    <th
+                      key={plan.id}
+                      className="border-b border-[#eadfd7] px-4 py-3 text-left text-sm font-bold text-[#2d1f18]"
+                    >
+                      {plan.displayName}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON_ROWS.map((row) => (
+                  <tr key={row.label}>
+                    <td className="border-b border-[#f4ece6] px-4 py-3 text-sm font-medium text-[#5f4d42]">
+                      {row.label}
+                    </td>
+                    {plans.map((plan) => (
+                      <td key={`${row.label}-${plan.id}`} className="border-b border-[#f4ece6] px-4 py-3 text-sm text-[#2d1f18]">
+                        {row.render(plan)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <section className="py-16 px-4 bg-[#faf7f4] dark:bg-[#1f1610]">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-center text-[#2d1f18] dark:text-white mb-8">
-            よくある質問
-          </h2>
+      <section className="bg-[#faf7f4] px-4 py-16">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-8 max-w-2xl">
+            <span className="mb-3 inline-block rounded-full bg-[#2d1f18] px-3 py-1 text-xs font-bold text-white">
+              設計案
+            </span>
+            <h2 className="text-2xl font-bold text-[#2d1f18]">買い切り型はこの価格なら成立しやすいです</h2>
+            <p className="mt-3 text-sm leading-7 text-[#5f4d42]">
+              月額に入るほどではない単発案件向けには、サブスクより割高な買い切りパックが自然です。
+              1回の購入で数本まとめて仕上げられ、継続利用者は Pro に流れる価格差を維持できます。
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-3xl border border-[#eadfd7] bg-white p-8 shadow-sm">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#2d1f18]">{ONE_TIME_PACK_SUGGESTION.displayName}</h3>
+                  <p className="mt-2 text-sm text-[#8a756b]">{ONE_TIME_PACK_SUGGESTION.description}</p>
+                </div>
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+                  準備中
+                </span>
+              </div>
+
+              <div className="mb-5">
+                <span className="text-4xl font-black text-[#2d1f18]">{ONE_TIME_PACK_SUGGESTION.priceLabel}</span>
+                <span className="text-sm text-[#8a756b]">{ONE_TIME_PACK_SUGGESTION.periodLabel}</span>
+              </div>
+
+              <ul className="space-y-3 text-sm text-[#2d1f18]">
+                <li className="flex items-start gap-3">
+                  <span className="mt-0.5 text-primary">●</span>
+                  <span>{ONE_TIME_PACK_SUGGESTION.processingMinutes}分まで処理</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="mt-0.5 text-primary">●</span>
+                  <span>{ONE_TIME_PACK_SUGGESTION.validDays}日有効</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="mt-0.5 text-primary">●</span>
+                  <span>1本あたり最大{ONE_TIME_PACK_SUGGESTION.maxSingleVideoMinutes}分</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="mt-0.5 text-primary">●</span>
+                  <span>{ONE_TIME_PACK_SUGGESTION.maxQuality}書き出し</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="mt-0.5 text-primary">●</span>
+                  <span>SRT書き出し・サムネイル生成込み</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="rounded-3xl border border-[#eadfd7] bg-white p-8 shadow-sm">
+              <h3 className="text-lg font-bold text-[#2d1f18]">価格の考え方</h3>
+              <ul className="mt-4 space-y-3 text-sm leading-7 text-[#5f4d42]">
+                <li>月額 Pro より割高にして、継続利用は Pro に寄せます。</li>
+                <li>Free の延長ではなく、単発案件を完了させるための上位体験として設計します。</li>
+                <li>4K、優先処理、チーム共有は含めず、実装済み機能だけを束ねます。</li>
+                <li>有効期限を 30 日に切ると、買い溜め用途を防ぎやすくなります。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-16">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="mb-8 text-center text-2xl font-bold text-[#2d1f18]">よくある質問</h2>
           <div className="space-y-4">
             {[
               {
-                q: '無料プランの制限は何ですか？',
-                a: '無料プランは月90分まで、1本あたり最大10分です。書き出しは720pでウォーターマーク付きです。',
+                q: 'SRT書き出しはできますか？',
+                a: 'はい。Pro と Business では SRT を別ファイルで書き出せます。Free は動画への焼き込みのみです。',
               },
               {
-                q: 'いつでもキャンセルできますか？',
-                a: 'はい。キャンセル後も当月末までは現在のプランをご利用いただけます。',
+                q: '優先キューやチーム共有はありますか？',
+                a: '現時点では提供していません。料金表や LP でもその訴求は外しています。',
               },
               {
-                q: '4K書き出しはどのプランで使えますか？',
-                a: '4KはBusiness以上で利用できます。4K書き出し時は処理分数を1.5倍消費します。',
+                q: 'どのプランから始めるのがよいですか？',
+                a: 'まずは Free で処理品質を確認し、SRT やサムネイルが必要になったら Pro へ上げるのが自然です。',
               },
               {
-                q: '上限を超えたらどうなりますか？',
-                a: '今月の残り処理分数が足りない場合は、上位プランへのアップグレードをご案内します。Enterpriseでは個別設計にも対応します。',
+                q: '買い切り型はすぐ使えますか？',
+                a: 'まだ準備中です。まずは月額プランを提供し、需要が見えたら買い切りパックを追加する前提です。',
               },
-            ].map((faq, index) => (
-              <div
-                key={index}
-                className="bg-white dark:bg-[#2a1d15] rounded-xl p-6 border border-[#f0e6df] dark:border-[#3a2a20]"
-              >
-                <h3 className="font-bold text-[#2d1f18] dark:text-white mb-2">{faq.q}</h3>
-                <p className="text-sm text-[#8a756b] leading-relaxed">{faq.a}</p>
+            ].map((faq) => (
+              <div key={faq.q} className="rounded-xl border border-[#f0e6df] bg-white p-6">
+                <h3 className="mb-2 font-bold text-[#2d1f18]">{faq.q}</h3>
+                <p className="text-sm leading-relaxed text-[#8a756b]">{faq.a}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <footer className="py-8 px-4 border-t border-[#f0e6df] dark:border-[#3a2a20]">
-        <div className="max-w-7xl mx-auto flex flex-col items-center gap-3 text-center">
+      <footer className="border-t border-[#f0e6df] px-4 py-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center gap-3 text-center">
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-[#8a756b]">
-            <Link href="/terms" className="hover:text-[#2d1f18] dark:hover:text-white">
+            <Link href="/terms" className="hover:text-[#2d1f18]">
               利用規約
             </Link>
-            <Link href="/privacy" className="hover:text-[#2d1f18] dark:hover:text-white">
+            <Link href="/privacy" className="hover:text-[#2d1f18]">
               プライバシーポリシー
             </Link>
-            <Link
-              href="/commercial-transactions"
-              className="hover:text-[#2d1f18] dark:hover:text-white"
-            >
+            <Link href="/commercial-transactions" className="hover:text-[#2d1f18]">
               特定商取引法に基づく表記
             </Link>
           </div>

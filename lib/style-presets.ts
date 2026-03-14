@@ -6,6 +6,7 @@ export interface StylePresetDefinition {
   badge: string
   accentColor: string
   coverGradient: string
+  coverImage?: string
   usageLabel: string
   cutSettings: {
     minSilence: number
@@ -39,6 +40,7 @@ export const STYLE_PRESETS: StylePresetDefinition[] = [
     badge: '定番',
     accentColor: '#f97316',
     coverGradient: 'from-[#4d8a7a] to-[#8bb08d]',
+    coverImage: '/style-covers/youtuber-classic.png',
     usageLabel: '12,345人が使用',
     cutSettings: { minSilence: 0.25, aggressiveness: 'high', targetCutsPerMinute: 18 },
     subtitleSettings: {
@@ -59,6 +61,7 @@ export const STYLE_PRESETS: StylePresetDefinition[] = [
     badge: 'Business',
     accentColor: '#3b82f6',
     coverGradient: 'from-[#5c8fc1] to-[#9ec0e8]',
+    coverImage: '/style-covers/business-seminar.png',
     usageLabel: '8,920人が使用',
     cutSettings: { minSilence: 0.45, aggressiveness: 'low', targetCutsPerMinute: 9 },
     subtitleSettings: {
@@ -79,6 +82,7 @@ export const STYLE_PRESETS: StylePresetDefinition[] = [
     badge: '人気急上昇',
     accentColor: '#8b5cf6',
     coverGradient: 'from-[#3182ce] to-[#63b3ed]',
+    coverImage: '/style-covers/shorts-boost.png',
     usageLabel: '今週 +15%',
     cutSettings: { minSilence: 0.18, aggressiveness: 'high', targetCutsPerMinute: 28 },
     subtitleSettings: {
@@ -99,6 +103,7 @@ export const STYLE_PRESETS: StylePresetDefinition[] = [
     badge: 'Vlog',
     accentColor: '#78716c',
     coverGradient: 'from-[#111827] to-[#374151]',
+    coverImage: '/style-covers/cinematic-vlog.png',
     usageLabel: '4,100人が使用',
     cutSettings: { minSilence: 0.4, aggressiveness: 'medium', targetCutsPerMinute: 8 },
     subtitleSettings: {
@@ -119,6 +124,7 @@ export const STYLE_PRESETS: StylePresetDefinition[] = [
     badge: '教育',
     accentColor: '#22c55e',
     coverGradient: 'from-[#3b7f74] to-[#6fc4a8]',
+    coverImage: '/style-covers/edu-zundamon.png',
     usageLabel: '15,200人が使用',
     cutSettings: { minSilence: 0.22, aggressiveness: 'medium', targetCutsPerMinute: 14 },
     subtitleSettings: {
@@ -139,6 +145,7 @@ export const STYLE_PRESETS: StylePresetDefinition[] = [
     badge: 'ゲーム',
     accentColor: '#6366f1',
     coverGradient: 'from-[#0f172a] to-[#334155]',
+    coverImage: '/style-covers/gaming-highlight.png',
     usageLabel: '7,800人が使用',
     cutSettings: { minSilence: 0.15, aggressiveness: 'high', targetCutsPerMinute: 24 },
     subtitleSettings: {

@@ -309,6 +309,9 @@ function ProjectCard({
     ? `/api/thumbnail/generated/${project.selectedThumbnailId}`
     : primaryVideo?.thumbnailUrl ?? null
 
+  // サムネイルもない場合、ソース動画の最初のフレームを表示
+  const videoPreviewSrc = !thumbnailSrc ? `/api/projects/${project.id}/source-video` : null
+
   return (
     <Link
       href={getProjectHref(project)}
@@ -323,8 +326,18 @@ function ProjectCard({
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
             className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
+        ) : videoPreviewSrc ? (
+          <video
+            src={videoPreviewSrc}
+            preload="metadata"
+            muted
+            playsInline
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
         ) : (
-          <div className={`h-full w-full bg-gradient-to-br ${gradient}`} />
+          <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${gradient}`}>
+            <span className="text-sm font-bold text-[#9e6b47]/60">No Image</span>
+          </div>
         )}
 
         <span

@@ -1,23 +1,36 @@
 import type { Metadata } from 'next'
-import { Inter, Noto_Sans_JP } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({
-  variable: '--font-inter',
-  subsets: ['latin'],
-})
-
-const notoSansJP = Noto_Sans_JP({
-  variable: '--font-noto-sans-jp',
-  subsets: ['latin'],
-  weight: ['400', '500', '700', '900'],
-})
-
 export const metadata: Metadata = {
-  title: 'SakuEdit - AI動画編集ツール',
+  title: {
+    default: 'SakuEdit - AI動画編集ツール',
+    template: '%s | SakuEdit',
+  },
   description:
     '急いで動画編集したい人・編集分からない人でもサクッと編集できる。参考動画のスタイルをAIが学習し、字幕・カット・テンポを自動で再現します。',
-  keywords: ['動画編集', 'AI', '字幕', 'YouTuber', 'スタイル分析'],
+  keywords: ['動画編集', 'AI', '字幕', 'YouTuber', 'スタイル分析', '無音カット', '自動編集'],
+  openGraph: {
+    type: 'website',
+    locale: 'ja_JP',
+    siteName: 'SakuEdit',
+    title: 'SakuEdit - 動画を上げたら、編集は終わっている',
+    description: 'アップロード後に無音カット・字幕生成・サムネイル作成まで一気に処理。必要なところだけ手直しして、すぐに公開できます。',
+    images: [
+      {
+        url: '/ogp.png',
+        width: 1424,
+        height: 752,
+        alt: 'SakuEdit - AI動画編集ツールのエディタ画面',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SakuEdit - 動画を上げたら、編集は終わっている',
+    description: 'アップロード後に無音カット・字幕生成・サムネイル作成まで一気に処理。',
+    images: ['/ogp.png'],
+  },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://sakuedit.com'),
 }
 
 export default function RootLayout({
@@ -34,7 +47,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${notoSansJP.variable} font-sans antialiased bg-background-light dark:bg-background-dark text-[#1c130d] dark:text-white`}
+        className="font-sans antialiased bg-background-light dark:bg-background-dark text-[#1c130d] dark:text-white"
       >
         {children}
       </body>

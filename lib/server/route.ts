@@ -80,7 +80,7 @@ export async function getRequiredUserId(
   request: NextRequest,
   options?: { allowTestUserId?: boolean },
 ) {
-  if (options?.allowTestUserId && process.env.NODE_ENV === 'development') {
+  if (options?.allowTestUserId && process.env.NODE_ENV !== 'production') {
     const testUserId = request.nextUrl.searchParams.get('testUserId')
     if (testUserId) {
       return testUserId

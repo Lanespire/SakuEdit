@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { z } from 'zod'
@@ -89,7 +90,10 @@ function PresetCard({
 }) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-[24px] border border-[#f0e6df] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
-      <div className={`relative aspect-video bg-gradient-to-br ${preset.coverGradient}`}>
+      <div className={`relative aspect-video ${preset.coverImage ? '' : `bg-gradient-to-br ${preset.coverGradient}`}`}>
+        {preset.coverImage && (
+          <Image src={preset.coverImage} alt={preset.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+        )}
         <div className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold text-white">
           {preset.badge}
         </div>
@@ -114,8 +118,7 @@ function PresetCard({
           </span>
         </div>
         <p className="line-clamp-2 text-sm text-[#8a756b]">{preset.description}</p>
-        <div className="mt-auto flex items-center justify-between pt-5">
-          <p className="text-xs font-medium text-[#8a756b]">{preset.usageLabel}</p>
+        <div className="mt-auto flex items-center justify-end pt-5">
           <button
             type="button"
             onClick={() => onApply(preset.id)}

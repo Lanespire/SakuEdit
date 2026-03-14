@@ -183,10 +183,13 @@ sakuedit/
 │   │   │   └── signup/
 │   │   ├── dashboard/          # ダッシュボード
 │   │   ├── projects/          # プロジェクト一覧
-│   │   ├── editor/            # 動画編集画面
+│   │   ├── edit/              # 動画編集画面（React Video Editor Pro）
 │   │   │   ├── [id]/
-│   │   │   │   ├── page.tsx   # メイン編集画面
-│   │   │   │   └── subtitles/ # 字幕編集モーダル
+│   │   │   │   └── page.tsx   # メイン編集画面
+│   │   │   ├── layout.tsx     # RVE 用レイアウト
+│   │   │   └── editor.css     # RVE 用スタイル読込
+│   │   ├── reactvideoeditor/  # React Video Editor Pro 組み込み
+│   │   │   └── pro/
 │   │   ├── export/            # 書き出し設定
 │   │   ├── pricing/           # 料金プラン
 │   │   ├── api/               # API Routes
@@ -199,10 +202,8 @@ sakuedit/
 │   │   └── page.tsx           # ランディングページ
 │   ├── components/             # Reactコンポーネント
 │   │   ├── ui/                # UI基本コンポーネント
-│   │   ├── editor/            # エディタコンポーネント
-│   │   │   ├── timeline/      # タイムライン
-│   │   │   ├── preview/       # プレビュー
-│   │   │   └── controls/      # コントロール
+│   │   ├── editor/            # 既存処理UIなどの補助コンポーネント
+│   │   ├── rve/               # RVE と SakuEdit の接続層
 │   │   ├── modals/            # モーダル
 │   │   └── upload/            # アップロード
 │   ├── lib/                   # ユーティリティ

@@ -82,6 +82,10 @@ function getStatusIcon(status: "completed" | "processing" | "pending") {
   }
 }
 
+function isRemotionRenderingInProgress(status: string, progress: number) {
+  return status === "PROCESSING" && progress >= 80 && progress < 90;
+}
+
 export default function ProcessingWorkspace({
   projectName,
   status,
@@ -104,6 +108,7 @@ export default function ProcessingWorkspace({
 
     return "動画を処理中";
   }, [status]);
+  const showRemotionNotice = isRemotionRenderingInProgress(status, progress);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#1a1411] font-display text-white">
@@ -214,6 +219,12 @@ export default function ProcessingWorkspace({
             <p className="mt-3 text-sm text-white/72">
               {lastError || progressMessage || "処理状況を取得しています"}
             </p>
+            {showRemotionNotice ? (
+              <p className="mt-2 text-xs text-white/50">
+                Remotionレンダリング中です。数分かかることがあり、最後の
+                「circle」は次工程がまだ始まっていないだけです。
+              </p>
+            ) : null}
           </div>
           <div
             className="mt-5 flex-1 overflow-hidden rounded-2xl border border-white/8 bg-[#18120f] p-4"

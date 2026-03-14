@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { authClient } from '@/lib/auth-client'
@@ -46,7 +47,7 @@ export default function Header({ currentPage }: HeaderProps) {
       <div className="max-w-[1200px] mx-auto px-4 h-full flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2" data-test-id="header-logo">
-            <span className="text-2xl">🎬</span>
+            <Image src="/logo.svg" alt="SakuEdit ロゴ" width={28} height={28} />
             <span className="font-bold text-lg tracking-tight text-[#1c130d] dark:text-white">
               SakuEdit
             </span>

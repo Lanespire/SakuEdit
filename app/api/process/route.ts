@@ -10,7 +10,7 @@ import {
 import {
   enqueueProjectProcessing,
 } from '@/lib/server/processing-jobs'
-import { getRequiredUserId } from '@/lib/server/route'
+import { getRequiredUserId, RouteError } from '@/lib/server/route'
 import { dispatchProcessingJobOrMarkFailure } from '@/lib/server/processing-dispatch'
 
 async function withMaterializedVideo<T>(
@@ -67,8 +67,15 @@ export async function POST(request: NextRequest) {
       status: result.shouldInvoke ? 'queued' : result.job.status.toLowerCase(),
     }, { status: 202 })
   } catch (error) {
+    if (error instanceof RouteError) {
+      return NextResponse.json(error.payload, { status: error.status })
+    }
+    console.error('Process error:', error)
+    const message = process.env.NODE_ENV === 'production'
+      ? '処理中にエラーが発生しました'
+      : `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`
     return NextResponse.json(
-      { error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      { error: message },
       { status: 500 }
     )
   }
@@ -89,6 +96,7 @@ export async function GET(request: NextRequest) {
   const inputPath = getProjectAssetStoragePath(projectId, 'input.mp4')
 
   try {
+    const userId = await getRequiredUserId(request)
     // プロジェクト情報を取得
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -98,7 +106,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    if (!project) {
+    if (!project || project.userId !== userId) {
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 404 }
@@ -139,6 +147,9 @@ export async function GET(request: NextRequest) {
         )
     }
   } catch (error) {
+    if (error instanceof RouteError) {
+      return NextResponse.json(error.payload, { status: error.status })
+    }
     console.error('Error:', error)
     return NextResponse.json(
       { error: 'Failed to process request' },

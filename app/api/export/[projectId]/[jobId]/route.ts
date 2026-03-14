@@ -9,7 +9,7 @@ export async function GET(
   try {
     const url = new URL(request.url)
     const testUserId = url.searchParams.get('testUserId')
-    const isTestMode = process.env.NODE_ENV === 'development' && testUserId
+    const isTestMode = process.env.NODE_ENV !== 'production' && testUserId
 
     let userId: string
 

@@ -20,8 +20,10 @@ export async function POST(request: NextRequest) {
     const result = await composeBGM({ prompt, format, looping })
     return NextResponse.json(result)
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown error'
+    console.error('BGM generation error:', error)
+    const message = process.env.NODE_ENV === 'production'
+      ? 'BGMの生成中にエラーが発生しました'
+      : error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

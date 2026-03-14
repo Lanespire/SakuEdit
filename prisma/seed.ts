@@ -108,7 +108,7 @@ async function main() {
       hasWatermark: false,
       hasSrtExport: true,
       hasThumbnail: true,
-      hasPriorityQueue: true,
+      hasPriorityQueue: false,
       teamSeats: 0,
     },
   })
@@ -129,8 +129,8 @@ async function main() {
       hasWatermark: false,
       hasSrtExport: true,
       hasThumbnail: true,
-      hasPriorityQueue: true,
-      teamSeats: 3,
+      hasPriorityQueue: false,
+      teamSeats: 0,
     },
   })
   console.log('Created Business plan:', businessPlan.id)
@@ -150,7 +150,7 @@ async function main() {
       hasWatermark: false,
       hasSrtExport: true,
       hasThumbnail: true,
-      hasPriorityQueue: true,
+      hasPriorityQueue: false,
       teamSeats: 0, // 個別設定
     },
   })

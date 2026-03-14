@@ -1,0 +1,1 @@
+SakuEdit は Next.js 16 / React 19 / TypeScript ベースの動画編集アプリ。主機能は動画アップロード、スタイル分析、字幕生成、無音検出、編集、書き出し。インフラは SST、DB は Prisma(SQLite 設定)、編集画面は app/edit/[id]/page.tsx、Remotion 構成は remotion/ 配下、主要UIは components/editor/ 配下、API は app/api/ 配下。

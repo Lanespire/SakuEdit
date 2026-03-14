@@ -15,41 +15,25 @@ test.describe('Pricing Page', () => {
     await expect(page.getByRole('heading', { name: 'Free' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Pro' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Business' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Enterprise' })).toBeVisible()
   })
 
   test('should display Free plan price', async ({ page }) => {
     // 価格表示
-    await expect(page.getByText('¥0')).toBeVisible()
+    await expect(page.getByTestId('plan-free').getByText('¥0')).toBeVisible()
   })
 
   test('should display Pro plan price', async ({ page }) => {
     // 価格表示
-    await expect(page.getByText('¥2,480')).toBeVisible()
+    await expect(page.getByTestId('plan-pro').getByText('¥2,480')).toBeVisible()
   })
 
   test('should display Business plan price', async ({ page }) => {
     // 価格表示
-    await expect(page.getByText('¥8,980')).toBeVisible()
+    await expect(page.getByTestId('plan-business').getByText('¥8,980')).toBeVisible()
   })
 
-  test('should display Enterprise plan as custom', async ({ page }) => {
-    // Enterpriseプランは要相談表示
-    await expect(page.getByText('要相談')).toBeVisible()
-  })
-
-  test('should display feature list with check marks', async ({ page }) => {
-    // チェックマーク（含まれる機能）
-    const checkIcons = page.locator('.material-symbols-outlined:has-text("check_circle")')
-    const checkCount = await checkIcons.count()
-    expect(checkCount).toBeGreaterThan(0)
-  })
-
-  test('should display feature list with cancel marks', async ({ page }) => {
-    // ×マーク（含まれない機能）
-    const cancelIcons = page.locator('.material-symbols-outlined:has-text("cancel")')
-    const cancelCount = await cancelIcons.count()
-    expect(cancelCount).toBeGreaterThan(0)
+  test('should explain current offering scope', async ({ page }) => {
+    await expect(page.getByText('優先キューやチーム共有は現時点では提供していない')).toBeVisible()
   })
 
   test('should display FAQ section', async ({ page }) => {
@@ -58,17 +42,21 @@ test.describe('Pricing Page', () => {
   })
 
   test('should display trial offer', async ({ page }) => {
-    // Proプランが人気No.1として表示される
-    const popularBadge = page.getByText('人気No.1')
+    // Proプランがおすすめとして表示される
+    const popularBadge = page.getByText('おすすめ')
     if (await popularBadge.isVisible()) {
       await expect(popularBadge).toBeVisible()
     }
   })
 
   test('should have CTA buttons', async ({ page }) => {
-    // CTAボタンが存在することを確認
-    const ctaButtons = page.getByRole('button', { name: /無料で始める|Proを始める|Businessを始める|お問い合わせ/ })
-    const count = await ctaButtons.count()
-    expect(count).toBeGreaterThanOrEqual(4)
+    await expect(page.getByTestId('cta-free')).toBeVisible()
+    await expect(page.getByTestId('cta-pro')).toBeVisible()
+    await expect(page.getByTestId('cta-business')).toBeVisible()
+  })
+
+  test('should display one-time pack proposal', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: /買い切り型はこの価格なら成立しやすいです/i })).toBeVisible()
+    await expect(page.getByText('¥4,980')).toBeVisible()
   })
 })

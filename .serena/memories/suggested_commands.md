@@ -1,0 +1,1 @@
+主要コマンド: `npm run dev` 開発サーバー、`npm run build` 本番ビルド、`npm run lint` ESLint、`npm run remotion:preview` Remotion preview、`npm run remotion:render` Remotion render、`npm run test:e2e` Playwright E2E、`npm run test:e2e:ui` E2E UI、`npm run prisma:seed` seed、`npm run prisma:reset` DB リセット。Darwin 基本コマンドは `git`, `ls`, `cd`, `rg`, `sed`, `open`。

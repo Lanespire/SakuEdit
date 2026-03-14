@@ -1,0 +1,96 @@
+SakuEdit 旧 editor 画面要素一覧
+
+1. メイン編集画面
+
+- ヘッダー
+  - プロジェクト名
+  - Undo / Redo
+  - 保存
+  - 書き出し
+  - 時期によってはサムネ生成
+  - 対応コンポーネント: components/editor/EditorHeader.tsx
+
+- 動画プレビュー
+  - 再生プレビュー
+  - 字幕やオーバーレイの重ね表示
+  - 再生操作
+  - 対応コンポーネント: components/editor/VideoPlayer.tsx
+
+- タイムライン
+  - マルチトラック編集
+  - 再生ヘッド
+  - ズーム
+  - ドラッグ移動
+  - リサイズ
+  - 対応コンポーネント: components/editor/MultiTrackTimeline.tsx
+
+- 左サイド追加導線
+  - テキスト追加
+  - 画像追加
+  - 動画追加
+  - 音声追加
+  - 図形追加
+  - 対応コンポーネント:
+    - components/editor/EditorSidebar.tsx
+    - components/editor/AddItemPanel.tsx
+
+- 右インスペクタ
+  - 選択中アイテムのプロパティ編集
+  - 対応コンポーネント:
+    - components/editor/PropertyPanel.tsx
+    - components/editor/RightInspector.tsx
+
+- AI / 提案パネル
+  - 編集提案
+  - 自然言語編集
+  - 補助操作
+  - 対応コンポーネント: components/editor/IntegratedEditorPanel.tsx
+
+- 字幕パネル
+  - 字幕一覧
+  - 字幕編集導線
+  - 対応コンポーネント: components/editor/SubtitlePanel.tsx
+
+- カットパネル
+  - 無音カット
+  - 区間調整
+  - 対応コンポーネント: components/editor/CutPanel.tsx
+
+- スタイルパネル
+  - 字幕や見た目のスタイル設定
+  - 対応コンポーネント: components/editor/StylePanel.tsx
+
+- 音声ブラウザ
+  - BGM / SE / 音声素材の追加
+  - 対応コンポーネント: components/editor/AudioBrowser.tsx
+
+- 波形表示トラック
+  - 音声の波形確認
+  - 対応コンポーネント: components/editor/AudioWaveformTrack.tsx
+
+- 書き出し完了シート
+  - エクスポート後の完了表示
+  - 対応コンポーネント: components/editor/ExportCompleteSheet.tsx
+
+2. 付随画面
+
+- 処理中ワークスペース
+  - 進捗
+  - ログ
+  - リトライ
+  - 戻る
+  - 対応コンポーネント: components/editor/ProcessingWorkspace.tsx
+
+- 字幕詳細モーダル
+  - 1件ずつの字幕詳細編集
+  - 対応コンポーネント: components/modals/SubtitleEditModal.tsx
+
+3. 旧 editor の全体構成まとめ
+
+- ヘッダー
+- プレビュー
+- タイムライン
+- 左追加パネル
+- 右インスペクタ
+- AI / 字幕 / カット / スタイル系パネル
+- 各種モーダル
