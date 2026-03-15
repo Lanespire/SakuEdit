@@ -2,10 +2,21 @@ import React, { createContext, useContext, useState } from "react";
 import { OverlayType } from "../types";
 import { useSidebar } from "../components/ui/sidebar";
 
+// SakuEdit custom panel types (beyond standard RVE OverlayType)
+export const SakuEditPanel = {
+  SUBTITLE: 'sakuedit-subtitle' as const,
+  CUT: 'sakuedit-cut' as const,
+  STYLE: 'sakuedit-style' as const,
+  AUDIO: 'sakuedit-audio' as const,
+  AI: 'sakuedit-ai' as const,
+}
+
+export type SidebarPanelType = OverlayType | typeof SakuEditPanel[keyof typeof SakuEditPanel]
+
 // Define the shape of our context data
 type EditorSidebarContextType = {
-  activePanel: OverlayType; // Stores the currently active panel name
-  setActivePanel: (panel: OverlayType) => void; // Function to update the active panel
+  activePanel: SidebarPanelType; // Stores the currently active panel name
+  setActivePanel: (panel: SidebarPanelType) => void; // Function to update the active panel
   setIsOpen: (open: boolean) => void;
 };
 
@@ -27,7 +38,7 @@ export const useEditorSidebar = () => {
 export const SidebarProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
-  const [activePanel, setActivePanel] = useState<OverlayType>(OverlayType.VIDEO);
+  const [activePanel, setActivePanel] = useState<SidebarPanelType>(OverlayType.VIDEO);
   const uiSidebar = useSidebar();
 
   const setIsOpen = (open: boolean) => {

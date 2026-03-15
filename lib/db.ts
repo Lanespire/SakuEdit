@@ -26,7 +26,13 @@ function getTursoConfig() {
 function createPrismaClient() {
   const tursoConfig = getTursoConfig()
   const adapter = new PrismaLibSql(tursoConfig)
-  return new PrismaClient({ adapter })
+  return new PrismaClient({
+    adapter,
+    transactionOptions: {
+      maxWait: 10000,
+      timeout: 30000,
+    },
+  })
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()

@@ -5,6 +5,8 @@ import { prisma } from '@/lib/db'
 import { resolveUserPlan } from '@/lib/billing'
 import { canUseQuality, type ExportQuality } from '@/lib/plans'
 import { transcribeAudio, generateSubtitles } from '@/lib/ai'
+import { isDeepgramConfigured, transcribeWithDeepgram } from '@/lib/deepgram-adapter'
+import { correctTranscription } from '@/lib/ai-text-correction'
 import {
   detectSilence,
   extractAudio,
@@ -247,26 +249,69 @@ export async function runProjectProcessing({
         },
       })
     } else {
-      let asrResult
+      // Determine transcription method based on user plan
+      const { plan } = await resolveUserPlan(project.userId)
+      const isPremium = plan.id !== 'free'
+      const useDeepgram = isPremium && isDeepgramConfigured()
+
+      let asrResult: { text: string; segments: Array<{ start: number; end: number; text: string }> }
       try {
-        asrResult = await transcribeAudio(audioPath, 'ja')
+        if (useDeepgram) {
+          await updateProcessingProgress({
+            jobId,
+            projectId: resolvedProjectId,
+            progress: 25,
+            progressMessage: 'Deepgramで高精度文字起こし中...',
+          })
+          const dgResult = await transcribeWithDeepgram(audioPath, 'ja')
+          asrResult = {
+            text: dgResult.text,
+            segments: dgResult.segments.map((s) => ({
+              start: s.start,
+              end: s.end,
+              text: s.text,
+            })),
+          }
+        } else {
+          asrResult = await transcribeAudio(audioPath, 'ja')
+        }
       } catch (error) {
         throw new Error(
           `Speech recognition failed: ${error instanceof Error ? error.message : 'Unknown error'}`
         )
       }
 
+      // AI text correction (context-based fixing)
+      await updateProcessingProgress({
+        jobId,
+        projectId: resolvedProjectId,
+        progress: 35,
+        progressMessage: 'AI文脈補正中...',
+      })
+
+      try {
+        const corrected = await correctTranscription(asrResult.segments, isPremium)
+        asrResult = {
+          text: corrected.map((s) => s.text).join(''),
+          segments: corrected.map((s) => ({ start: s.start, end: s.end, text: s.text })),
+        }
+      } catch (correctionError) {
+        console.warn('AI text correction failed, using raw transcription:', correctionError)
+        // Continue with uncorrected results
+      }
+
       await updateProcessingProgress({
         jobId,
         projectId: resolvedProjectId,
         progress: 40,
-        progressMessage: 'Generating subtitles...',
+        progressMessage: '字幕を生成中...',
       })
 
       subtitles = await generateSubtitles(
         asrResult.text,
         asrResult.segments,
         styleSettings.subtitleSettings,
+        isPremium,
       )
 
       await prisma.subtitle.deleteMany({ where: { projectId: resolvedProjectId } })
@@ -283,6 +328,12 @@ export async function runProjectProcessing({
           backgroundColor: styleSettings.subtitleSettings.backgroundColor,
           isBold: false,
         })),
+      })
+
+      // Reset compositionData so the editor rebuilds from fresh DB subtitles
+      await prisma.project.update({
+        where: { id: resolvedProjectId },
+        data: { compositionData: null },
       })
     }
 

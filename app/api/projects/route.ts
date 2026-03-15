@@ -18,7 +18,7 @@ const createProjectSchema = z.object({
 })
 
 export const GET = handleRoute(async (request: NextRequest) => {
-  const userId = await getRequiredUserId(request)
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
   const status = request.nextUrl.searchParams.get('status')
   const projectStatus =
     status && projectStatuses.has(status) ? (status as ProjectStatus) : undefined
@@ -44,7 +44,7 @@ export const GET = handleRoute(async (request: NextRequest) => {
 }, { onError: 'Failed to fetch projects' })
 
 export const POST = handleRoute(async (request: NextRequest) => {
-  const userId = await getRequiredUserId(request)
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
   const body = await parseJson(request, createProjectSchema)
 
   const project = await prisma.project.create({

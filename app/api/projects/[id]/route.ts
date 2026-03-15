@@ -50,7 +50,7 @@ export const GET = handleRoute(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const userId = await getRequiredUserId(request)
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
   const { id: projectId } = await params
   await getOwnedProject(projectId, userId)
 
@@ -116,7 +116,7 @@ export const PATCH = handleRoute(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const userId = await getRequiredUserId(request)
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
   const { id: projectId } = await params
   const body = await parseJson(request, updateProjectSchema)
 
@@ -154,7 +154,7 @@ export const DELETE = handleRoute(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const userId = await getRequiredUserId(request)
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
   const { id: projectId } = await params
 
   await getOwnedProject(projectId, userId)

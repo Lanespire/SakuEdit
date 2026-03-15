@@ -10,13 +10,16 @@ import {
   Layout,
   ChevronsLeft,
   Settings,
+  Scissors,
+  Palette,
+  Bot,
 } from "lucide-react";
 
 // Import OverlayType directly from types to avoid export issues
 import { OverlayType } from "../../types";
 
 // Import hooks and contexts directly
-import { useEditorSidebar } from "../../contexts/sidebar-context";
+import { useEditorSidebar, SakuEditPanel, type SidebarPanelType } from "../../contexts/sidebar-context";
 import { useEditorContext } from "../../contexts/editor-context";
 
 // Import overlay panels directly
@@ -29,6 +32,11 @@ import { LocalMediaPanel } from "../overlay/local-media/local-media-panel";
 import { StickersPanel } from "../overlay/stickers/stickers-panel";
 import { TemplateOverlayPanel } from "../overlay/templates/template-overlay-panel";
 import { SettingsPanel } from "../settings/settings-panel";
+
+// Import SakuEdit panels
+import { RveCutPanel } from "@/components/rve/panels/RveCutPanel";
+import { RveStylePanel } from "@/components/rve/panels/RveStylePanel";
+import { RveAiPanel } from "@/components/rve/panels/RveAiPanel";
 
 // Import UI components directly
 import {
@@ -63,16 +71,6 @@ interface DefaultSidebarProps {
 
 const DEFAULT_SIDEBAR_WIDTH = 448;
 
-/**
- * DefaultSidebar Component
- *
- * A dual-sidebar layout component for the video editor application.
- * Consists of two parts:
- * 1. A narrow icon-based sidebar on the left for main navigation
- * 2. A wider content sidebar that displays the active panel's content
- *
- * @component
- */
 export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
   logo,
   disabledPanels = [],
@@ -133,14 +131,14 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
   }, [setWidth]);
 
   // Get the selected overlay to check its type
-  const selectedOverlay = selectedOverlayId !== null 
-    ? overlays.find(overlay => overlay.id === selectedOverlayId) 
+  const selectedOverlay = selectedOverlayId !== null
+    ? overlays.find(overlay => overlay.id === selectedOverlayId)
     : null;
 
   // Only show back button if there's a selected overlay AND it matches the active panel type
   const shouldShowBackButton = selectedOverlay && selectedOverlay.type === activePanel;
-  
-  const getPanelTitle = (type: OverlayType): string => {
+
+  const getPanelTitle = (type: SidebarPanelType): string => {
     switch (type) {
       case OverlayType.VIDEO:
         return "動画";
@@ -160,74 +158,44 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
         return "テンプレート";
       case OverlayType.SETTINGS:
         return "設定";
+      case SakuEditPanel.CUT:
+        return "カット";
+      case SakuEditPanel.STYLE:
+        return "スタイル";
+      case SakuEditPanel.AI:
+        return "AI";
       default:
         return "不明";
     }
   };
 
-  const navigationItems = [
-    {
-      title: getPanelTitle(OverlayType.VIDEO),
-      url: "#",
-      icon: Film,
-      panel: OverlayType.VIDEO,
-      type: OverlayType.VIDEO,
-    },
-    {
-      title: getPanelTitle(OverlayType.TEXT),
-      url: "#",
-      icon: Type,
-      panel: OverlayType.TEXT,
-      type: OverlayType.TEXT,
-    },
-    {
-      title: getPanelTitle(OverlayType.SOUND),
-      url: "#",
-      icon: Music,
-      panel: OverlayType.SOUND,
-      type: OverlayType.SOUND,
-    },
-    {
-      title: getPanelTitle(OverlayType.CAPTION),
-      url: "#",
-      icon: Subtitles,
-      panel: OverlayType.CAPTION,
-      type: OverlayType.CAPTION,
-    },
-    {
-      title: getPanelTitle(OverlayType.IMAGE),
-      url: "#",
-      icon: ImageIcon,
-      panel: OverlayType.IMAGE,
-      type: OverlayType.IMAGE,
-    },
-    {
-      title: getPanelTitle(OverlayType.STICKER),
-      url: "#",
-      icon: Sticker,
-      panel: OverlayType.STICKER,
-      type: OverlayType.STICKER,
-    },
-    {
-      title: getPanelTitle(OverlayType.LOCAL_DIR),
-      url: "#",
-      icon: FolderOpen,
-      panel: OverlayType.LOCAL_DIR,
-      type: OverlayType.LOCAL_DIR,
-    },
-    {
-      title: getPanelTitle(OverlayType.TEMPLATE),
-      url: "#",
-      icon: Layout,
-      panel: OverlayType.TEMPLATE,
-      type: OverlayType.TEMPLATE,
-    },
+  const navigationItems: Array<{
+    title: string;
+    icon: React.FC<{ className?: string; strokeWidth?: number }>;
+    panel: SidebarPanelType;
+    type: OverlayType;
+  }> = [
+    { title: "動画", icon: Film, panel: OverlayType.VIDEO, type: OverlayType.VIDEO },
+    { title: "テキスト", icon: Type, panel: OverlayType.TEXT, type: OverlayType.TEXT },
+    { title: "音声", icon: Music, panel: OverlayType.SOUND, type: OverlayType.SOUND },
+    { title: "字幕", icon: Subtitles, panel: OverlayType.CAPTION, type: OverlayType.CAPTION },
+    { title: "画像", icon: ImageIcon, panel: OverlayType.IMAGE, type: OverlayType.IMAGE },
+    { title: "ステッカー", icon: Sticker, panel: OverlayType.STICKER, type: OverlayType.STICKER },
+    { title: "アップロード", icon: FolderOpen, panel: OverlayType.LOCAL_DIR, type: OverlayType.LOCAL_DIR },
+    { title: "テンプレート", icon: Layout, panel: OverlayType.TEMPLATE, type: OverlayType.TEMPLATE },
   ].filter((item) => !disabledPanels.includes(item.type));
 
-  /**
-   * Renders the appropriate panel component based on the active panel selection
-   * @returns {React.ReactNode} The component corresponding to the active panel
-   */
+  // SakuEdit custom panels
+  const sakuEditItems: Array<{
+    title: string;
+    icon: React.FC<{ className?: string; strokeWidth?: number }>;
+    panel: SidebarPanelType;
+  }> = [
+    { title: "カット", icon: Scissors, panel: SakuEditPanel.CUT },
+    { title: "スタイル", icon: Palette, panel: SakuEditPanel.STYLE },
+    { title: "AI", icon: Bot, panel: SakuEditPanel.AI },
+  ];
+
   const renderActivePanel = () => {
     switch (activePanel) {
       case OverlayType.TEXT:
@@ -248,10 +216,42 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
         return <TemplateOverlayPanel />;
       case OverlayType.SETTINGS:
         return <SettingsPanel />;
+      case SakuEditPanel.CUT:
+        return <RveCutPanel />;
+      case SakuEditPanel.STYLE:
+        return <RveStylePanel />;
+      case SakuEditPanel.AI:
+        return <RveAiPanel />;
       default:
         return null;
     }
   };
+
+  const renderNavItem = (item: { title: string; icon: React.FC<{ className?: string; strokeWidth?: number }>; panel: SidebarPanelType }) => (
+    <TooltipProvider key={item.title} delayDuration={0}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SidebarMenuButton
+            onClick={() => {
+              setActivePanel(item.panel);
+              setIsOpen(true);
+            }}
+            size="lg"
+            className="flex flex-col items-center gap-2 px-1.5 py-2.5"
+            data-active={activePanel === item.panel}
+          >
+            <item.icon className="h-4 w-4" strokeWidth={1.25} />
+            {showIconTitles && (
+              <span className="text-[8px] leading-none">
+                {item.title}
+              </span>
+            )}
+          </SidebarMenuButton>
+        </TooltipTrigger>
+        <TooltipContent side="right">{item.title}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 
   return (
     <Sidebar
@@ -259,7 +259,7 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
       className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
       style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
     >
-      {/* First sidebar */}
+      {/* Icon sidebar */}
       <Sidebar
         collapsible="none"
         className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r border-border "
@@ -286,71 +286,29 @@ export const DefaultSidebar: React.FC<DefaultSidebarProps> = ({
         </SidebarHeader>
         <SidebarContent className="border-t border-border">
           <SidebarGroup className="pt-3">
-            {navigationItems.map((item) => (
-              <TooltipProvider key={item.title} delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SidebarMenuButton
-                      onClick={() => {
-                        setActivePanel(item.panel);
-                        setIsOpen(true);
-                      }}
-                      size="lg"
-                      className="flex flex-col items-center gap-2 px-1.5 py-2.5"
-                      data-active={activePanel === item.panel}
-                    >
-                      <item.icon className="h-4 w-4" strokeWidth={1.25} />
-                      {showIconTitles && (
-                        <span className="text-[8px] leading-none">
-                          {item.title}
-                        </span>
-                      )}
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{item.title}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ))}
+            {navigationItems.map(renderNavItem)}
+          </SidebarGroup>
+          {/* SakuEdit独自パネル */}
+          <SidebarGroup className="border-t border-border pt-3">
+            {sakuEditItems.map(renderNavItem)}
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter className="border-t border-border  ">
+        <SidebarFooter className="border-t border-border">
           <SidebarMenu>
             <div className="flex items-center justify-center">
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SidebarMenuButton
-                      onClick={() => {
-                        setActivePanel(OverlayType.SETTINGS);
-                        setIsOpen(true);
-                      }}
-                      size="lg"
-                      className="flex flex-col items-center gap-2 px-1.5 py-2.5"
-                      data-active={activePanel === OverlayType.SETTINGS}
-                    >
-                      <Settings className="h-4 w-4" strokeWidth={1.25} />
-                      {showIconTitles && (
-                        <span className="text-[8px] leading-none">
-                          設定
-                        </span>
-                      )}
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">設定</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              {renderNavItem({ title: "設定", icon: Settings, panel: OverlayType.SETTINGS })}
             </div>
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
 
-      {/* Second sidebar */}
+      {/* Content sidebar */}
       <Sidebar collapsible="none" className="relative hidden min-w-0 flex-1 bg-background md:flex">
-      <SidebarHeader className="gap-3.5 border-b border-border px-4 py-3">
+        <SidebarHeader className="gap-3.5 border-b border-border px-4 py-3">
           <div className="flex w-full items-center justify-between">
             <div className="flex items-center justify-between w-full">
               <h3 className="font-extralight text-sidebar-foreground">
-                {activePanel ? getPanelTitle(activePanel) : ""} 
+                {activePanel ? getPanelTitle(activePanel) : ""}
               </h3>
               {shouldShowBackButton && (
                 <Button

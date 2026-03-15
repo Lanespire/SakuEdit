@@ -7,6 +7,7 @@ import {
   getRequiredUserId,
   handleRoute,
   notFound,
+  ok,
   parseJson,
 } from '@/lib/server/route'
 
@@ -36,11 +37,27 @@ async function assertOwnedProject(projectId: string, userId: string) {
   }
 }
 
+export const GET = handleRoute(async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
+  const { id: projectId } = await params
+  await assertOwnedProject(projectId, userId)
+
+  const subtitles = await prisma.subtitle.findMany({
+    where: { projectId },
+    orderBy: { startTime: 'asc' },
+  })
+
+  return ok({ subtitles })
+}, { onError: 'Failed to fetch subtitles' })
+
 export const POST = handleRoute(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const userId = await getRequiredUserId(request)
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
   const { id: projectId } = await params
   const body = await parseJson(request, subtitleMutationSchema)
 

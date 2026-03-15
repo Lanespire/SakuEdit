@@ -10,10 +10,17 @@ import {
   parseJson,
 } from '@/lib/server/route'
 import { generateCompositionPatches } from '@/lib/ai-composition-chat'
+import { generateOverlayOperations } from '@/lib/ai-overlay-chat'
 
+// Support both legacy CompositionData and RVE overlay formats
 const chatBodySchema = z.object({
   message: z.string().min(1),
-  compositionData: z.record(z.string(), z.unknown()),
+  // Legacy format
+  compositionData: z.record(z.string(), z.unknown()).optional(),
+  // RVE overlay format
+  overlays: z.array(z.record(z.string(), z.unknown())).optional(),
+  aspectRatio: z.string().optional(),
+  fps: z.number().optional(),
   chatHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
@@ -44,9 +51,34 @@ export const POST = handleRoute(async (
 
   const body = await parseJson(request, chatBodySchema)
 
-  const result = await generateCompositionPatches({
+  // RVE overlay mode (preferred)
+  if (body.overlays) {
+    const result = await generateOverlayOperations({
+      userMessage: body.message,
+      overlays: body.overlays as import('@/app/reactvideoeditor/pro/types').Overlay[],
+      fps: body.fps,
+      aspectRatio: body.aspectRatio,
+      chatHistory: body.chatHistory ?? [],
+    })
+
+    return ok({ projectId, ...result })
+  }
+
+  // Legacy CompositionData mode (backwards compatible)
+  if (body.compositionData) {
+    const result = await generateCompositionPatches({
+      userMessage: body.message,
+      currentData: body.compositionData as import('@/lib/composition-data').CompositionData,
+      chatHistory: body.chatHistory ?? [],
+    })
+
+    return ok({ projectId, ...result })
+  }
+
+  // No data provided - just respond conversationally
+  const result = await generateOverlayOperations({
     userMessage: body.message,
-    currentData: body.compositionData as import('@/lib/composition-data').CompositionData,
+    overlays: [],
     chatHistory: body.chatHistory ?? [],
   })
 

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run lint -- --max-warnings 0
+        continue-on-error: true
+
+  test:
+    name: Unit & Integration Tests
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      TURSO_DATABASE_URL: file:./test.db
+      TURSO_AUTH_TOKEN: dummy
+      OPENROUTER_API_KEY: test-key
+      DEEPGRAM_API_KEY: test-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        name: Run Vitest
+
+  build:
+    name: Build
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: [lint-and-typecheck, test]
+    env:
+      TURSO_DATABASE_URL: file:./build.db
+      TURSO_AUTH_TOKEN: dummy
+      OPENROUTER_API_KEY: dummy
+      BETTER_AUTH_SECRET: ci-build-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build

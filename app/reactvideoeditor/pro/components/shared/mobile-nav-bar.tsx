@@ -10,7 +10,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { useEditorSidebar } from "../../contexts/sidebar-context";
+import { useEditorSidebar, type SidebarPanelType } from "../../contexts/sidebar-context";
 import { OverlayType } from "../../types";
 import {
   Tooltip,
@@ -84,7 +84,7 @@ export function MobileNavBar() {
   }, [activePanel]);
 
   // Use shorter names on mobile
-  const getPanelTitle = (type: OverlayType): string => {
+  const getPanelTitle = (type: SidebarPanelType): string => {
     switch (type) {
       case OverlayType.VIDEO:
         return "動画";

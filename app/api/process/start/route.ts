@@ -17,7 +17,7 @@ const startProcessingSchema = z.object({
 })
 
 export const POST = handleRoute(async (request: NextRequest) => {
-  const userId = await getRequiredUserId(request)
+  const userId = await getRequiredUserId(request, { allowTestUserId: true })
   const body = await parseJson(request, startProcessingSchema)
 
   const { job, shouldInvoke, reused } = await enqueueProjectProcessing({
