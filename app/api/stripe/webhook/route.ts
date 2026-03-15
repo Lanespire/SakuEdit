@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { SubscriptionStatus } from '@prisma/client'
 import Stripe from 'stripe'
 import prisma from '@/lib/db'
-import { getPlanDefinitionByName, isPlanId, ONE_TIME_VALID_DAYS, type PlanId } from '@/lib/plans'
+import { getPlanDefinitionByName, isPlanId, type PlanId } from '@/lib/plans'
 import { badRequest, handleRoute, ok } from '@/lib/server/route'
 import { getStripe, getStripeWebhookSecret } from '@/lib/stripe'
 
@@ -118,7 +118,8 @@ export const POST = handleRoute(async (request: NextRequest) => {
 
           if (plan) {
             const now = new Date()
-            const periodEnd = new Date(now.getTime() + ONE_TIME_VALID_DAYS * 24 * 60 * 60 * 1000)
+            // 永久アクセス: far future (2099年) を設定
+            const periodEnd = new Date('2099-12-31T23:59:59Z')
 
             await prisma.subscription.upsert({
               where: { userId },
@@ -128,7 +129,7 @@ export const POST = handleRoute(async (request: NextRequest) => {
                 status: 'ACTIVE',
                 currentPeriodStart: now,
                 currentPeriodEnd: periodEnd,
-                cancelAtPeriodEnd: true,
+                cancelAtPeriodEnd: false,
                 stripeCustomerId: stripeCustomerId || null,
                 stripeSubscriptionId: null,
               },

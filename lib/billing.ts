@@ -58,14 +58,7 @@ export async function resolveUserPlan(userId: string): Promise<ResolvedUserPlan>
 
   let plan = getPlanDefinitionByName(subscription?.plan.name)
 
-  // 買い切りプランの有効期限チェック: currentPeriodEnd を過ぎていたら free に fallback
-  if (
-    plan.id === 'one-time' &&
-    subscription?.currentPeriodEnd &&
-    subscription.currentPeriodEnd < new Date()
-  ) {
-    plan = getPlanDefinitionByName('free')
-  }
+  // 買い切りプラン(one-time)は永久アクセス: 期限切れチェックしない
 
   return {
     plan,
@@ -86,9 +79,16 @@ export function isPremiumPlan(planId: PlanId): boolean {
 
 export async function getBillingSnapshot(userId: string): Promise<BillingSnapshot> {
   const resolved = await resolveUserPlan(userId)
-  const fallbackWindow = getCalendarBillingWindow(new Date())
-  const billedWindowStart = resolved.subscription.currentPeriodStart ?? fallbackWindow.start
-  const billedWindowEnd = resolved.subscription.currentPeriodEnd ?? fallbackWindow.end
+  const calendarWindow = getCalendarBillingWindow(new Date())
+
+  // 買い切りプランはカレンダー月ベースで分数リセット（永久アクセス）
+  const useCalendarWindow = resolved.plan.id === 'one-time' || resolved.plan.id === 'free'
+  const billedWindowStart = useCalendarWindow
+    ? calendarWindow.start
+    : (resolved.subscription.currentPeriodStart ?? calendarWindow.start)
+  const billedWindowEnd = useCalendarWindow
+    ? calendarWindow.end
+    : (resolved.subscription.currentPeriodEnd ?? calendarWindow.end)
 
   const usage = await prisma.usageLog.aggregate({
     where: {

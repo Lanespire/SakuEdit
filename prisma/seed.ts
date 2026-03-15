@@ -156,6 +156,27 @@ async function main() {
   })
   console.log('Created Enterprise plan:', enterprisePlan.id)
 
+  // 買い切りパック（永久アクセス）
+  const oneTimePlan = await prisma.plan.create({
+    data: {
+      name: 'one-time',
+      displayName: '買い切りパック',
+      price: 20000,
+      interval: 'lifetime',
+      maxSingleVideoMinutes: 30,
+      monthlyProcessingMinutes: 120,
+      monthlyStyleAnalysisCount: 5,
+      styleSlots: 10,
+      maxQuality: '1080p',
+      hasWatermark: false,
+      hasSrtExport: true,
+      hasThumbnail: true,
+      hasPriorityQueue: false,
+      teamSeats: 0,
+    },
+  })
+  console.log('Created One-time plan:', oneTimePlan.id)
+
   await ensureDemoUser()
 
   console.log('Seed completed successfully!')

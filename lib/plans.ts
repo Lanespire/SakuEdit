@@ -28,8 +28,9 @@ export const PUBLIC_PLAN_IDS: PlanId[] = ['free', 'pro', 'business', 'one-time']
 export const BILLABLE_PLAN_IDS: PlanId[] = ['pro', 'business', 'one-time']
 
 export const ONE_TIME_PRICE_YEN = 20000
-export const ONE_TIME_VALID_DAYS = 30
-export const ONE_TIME_PROCESSING_MINUTES = 600
+/** @deprecated 永久アクセスに変更。互換性のため残す */
+export const ONE_TIME_VALID_DAYS = 0
+export const ONE_TIME_PROCESSING_MINUTES = 120
 
 export const QUALITY_MULTIPLIERS: Record<ExportQuality, number> = {
   '720p': 1,
@@ -121,15 +122,15 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
   'one-time': {
     id: 'one-time',
     displayName: '買い切りパック',
-    description: '月額なし。必要な時だけ使いたい方に',
+    description: '一度の購入でずっと使える。月額不要',
     monthlyPriceYen: null,
     priceLabel: '¥20,000',
-    periodLabel: '/買い切り',
+    periodLabel: '（買い切り）',
     ctaLabel: '買い切りパックを購入',
     checkoutEnabled: true,
     monthlyProcessingMinutes: ONE_TIME_PROCESSING_MINUTES,
-    maxSingleVideoMinutes: 60,
-    monthlyStyleAnalysisCount: 10,
+    maxSingleVideoMinutes: 30,
+    monthlyStyleAnalysisCount: 5,
     maxQuality: '1080p',
     hasWatermark: false,
     hasSrtExport: true,
