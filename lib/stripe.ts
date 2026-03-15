@@ -53,12 +53,15 @@ export function getStripe() {
   return stripeClient
 }
 
-const PLAN_PRICE_ENV_KEYS: Record<Extract<PlanId, 'pro' | 'business'>, string> = {
+export type BillablePlanId = Extract<PlanId, 'pro' | 'business' | 'one-time'>
+
+const PLAN_PRICE_ENV_KEYS: Record<BillablePlanId, string> = {
   pro: 'STRIPE_PRO_PRICE_ID',
   business: 'STRIPE_BUSINESS_PRICE_ID',
+  'one-time': 'STRIPE_ONE_TIME_PRICE_ID',
 }
 
-export function getStripePriceId(planId: Extract<PlanId, 'pro' | 'business'>) {
+export function getStripePriceId(planId: BillablePlanId) {
   const priceId = process.env[PLAN_PRICE_ENV_KEYS[planId]]
 
   if (!priceId) {

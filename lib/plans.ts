@@ -1,4 +1,4 @@
-export type PlanId = 'free' | 'pro' | 'business' | 'enterprise'
+export type PlanId = 'free' | 'pro' | 'business' | 'enterprise' | 'one-time'
 export type ExportQuality = '720p' | '1080p' | '4k'
 export type SubtitleExportOption = 'burn' | 'srt' | 'both'
 
@@ -23,23 +23,13 @@ export interface PlanDefinition {
   teamSeats: number
 }
 
-export const PLAN_ORDER: PlanId[] = ['free', 'pro', 'business', 'enterprise']
-export const PUBLIC_PLAN_IDS: PlanId[] = ['free', 'pro', 'business']
-export const BILLABLE_PLAN_IDS: PlanId[] = ['pro', 'business']
+export const PLAN_ORDER: PlanId[] = ['free', 'pro', 'business', 'enterprise', 'one-time']
+export const PUBLIC_PLAN_IDS: PlanId[] = ['free', 'pro', 'business', 'one-time']
+export const BILLABLE_PLAN_IDS: PlanId[] = ['pro', 'business', 'one-time']
 
-export const ONE_TIME_PACK_SUGGESTION = {
-  id: 'one-time-pack',
-  displayName: '買い切りパック',
-  description: '月額契約をせずに 1 から 3 本仕上げたい方向けの設計案',
-  priceLabel: '¥4,980',
-  periodLabel: '/買い切り',
-  processingMinutes: 180,
-  validDays: 30,
-  maxSingleVideoMinutes: 60,
-  maxQuality: '1080p' as const,
-  hasSrtExport: true,
-  hasThumbnail: true,
-}
+export const ONE_TIME_PRICE_YEN = 20000
+export const ONE_TIME_VALID_DAYS = 30
+export const ONE_TIME_PROCESSING_MINUTES = 600
 
 export const QUALITY_MULTIPLIERS: Record<ExportQuality, number> = {
   '720p': 1,
@@ -128,6 +118,35 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
     hasPriorityQueue: false,
     teamSeats: 0,
   },
+  'one-time': {
+    id: 'one-time',
+    displayName: '買い切りパック',
+    description: '月額なし。必要な時だけ使いたい方に',
+    monthlyPriceYen: null,
+    priceLabel: '¥20,000',
+    periodLabel: '/買い切り',
+    ctaLabel: '買い切りパックを購入',
+    checkoutEnabled: true,
+    monthlyProcessingMinutes: ONE_TIME_PROCESSING_MINUTES,
+    maxSingleVideoMinutes: 60,
+    monthlyStyleAnalysisCount: 10,
+    maxQuality: '1080p',
+    hasWatermark: false,
+    hasSrtExport: true,
+    hasThumbnail: true,
+    monthlyThumbnailCount: 10,
+    hasPriorityQueue: false,
+    teamSeats: 0,
+  },
+}
+
+export const ONE_TIME_PACK = PLAN_DEFINITIONS['one-time']
+
+/** @deprecated Use ONE_TIME_PACK instead */
+export const ONE_TIME_PACK_SUGGESTION = {
+  ...ONE_TIME_PACK,
+  processingMinutes: ONE_TIME_PROCESSING_MINUTES,
+  validDays: ONE_TIME_VALID_DAYS,
 }
 
 const QUALITY_ORDER: ExportQuality[] = ['720p', '1080p', '4k']

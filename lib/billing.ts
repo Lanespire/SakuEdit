@@ -56,7 +56,16 @@ export async function resolveUserPlan(userId: string): Promise<ResolvedUserPlan>
     },
   })
 
-  const plan = getPlanDefinitionByName(subscription?.plan.name)
+  let plan = getPlanDefinitionByName(subscription?.plan.name)
+
+  // 買い切りプランの有効期限チェック: currentPeriodEnd を過ぎていたら free に fallback
+  if (
+    plan.id === 'one-time' &&
+    subscription?.currentPeriodEnd &&
+    subscription.currentPeriodEnd < new Date()
+  ) {
+    plan = getPlanDefinitionByName('free')
+  }
 
   return {
     plan,
@@ -69,6 +78,10 @@ export async function resolveUserPlan(userId: string): Promise<ResolvedUserPlan>
       cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
     },
   }
+}
+
+export function isPremiumPlan(planId: PlanId): boolean {
+  return planId !== 'free'
 }
 
 export async function getBillingSnapshot(userId: string): Promise<BillingSnapshot> {

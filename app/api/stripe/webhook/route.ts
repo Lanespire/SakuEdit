@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { SubscriptionStatus } from '@prisma/client'
 import Stripe from 'stripe'
 import prisma from '@/lib/db'
-import { getPlanDefinitionByName, isPlanId, type PlanId } from '@/lib/plans'
+import { getPlanDefinitionByName, isPlanId, ONE_TIME_VALID_DAYS, type PlanId } from '@/lib/plans'
 import { badRequest, handleRoute, ok } from '@/lib/server/route'
 import { getStripe, getStripeWebhookSecret } from '@/lib/stripe'
 
@@ -104,7 +104,47 @@ export const POST = handleRoute(async (request: NextRequest) => {
       const sessionPlanId = isPlanId(session.metadata?.planId || '')
         ? (session.metadata?.planId as PlanId)
         : undefined
-      if (session.mode === 'subscription' && typeof session.subscription === 'string') {
+
+      if (session.mode === 'payment' && sessionPlanId === 'one-time') {
+        // 買い切りプラン: 一括決済 → Subscription レコードを手動作成
+        const userId = session.metadata?.userId
+        const stripeCustomerId =
+          typeof session.customer === 'string' ? session.customer : session.customer?.id
+
+        if (userId) {
+          const plan = await prisma.plan.findUnique({
+            where: { name: 'one-time' },
+          })
+
+          if (plan) {
+            const now = new Date()
+            const periodEnd = new Date(now.getTime() + ONE_TIME_VALID_DAYS * 24 * 60 * 60 * 1000)
+
+            await prisma.subscription.upsert({
+              where: { userId },
+              create: {
+                userId,
+                planId: plan.id,
+                status: 'ACTIVE',
+                currentPeriodStart: now,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: true,
+                stripeCustomerId: stripeCustomerId || null,
+                stripeSubscriptionId: null,
+              },
+              update: {
+                planId: plan.id,
+                status: 'ACTIVE',
+                currentPeriodStart: now,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: true,
+                stripeCustomerId: stripeCustomerId || null,
+                stripeSubscriptionId: null,
+              },
+            })
+          }
+        }
+      } else if (session.mode === 'subscription' && typeof session.subscription === 'string') {
         const subscription = await stripe.subscriptions.retrieve(session.subscription)
         await syncSubscription(subscription, {
           userId: session.metadata?.userId,
